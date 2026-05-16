@@ -23,15 +23,19 @@ export default function Calibration() {
   const streamRef = useRef<MediaStream | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Assign stream to video once both ready
+  useEffect(() => {
+    if (streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current
+      videoRef.current.play().catch(() => {})
+    }
+  }, [cameraOk])
+
   useEffect(() => {
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          videoRef.current.play().catch(() => {})
-        }
         setCameraOk(true)
         setMicOk(true)
       } catch {}
@@ -122,7 +126,7 @@ export default function Calibration() {
                 </span>
               </div>
               <div className="absolute top-4 right-4">
-                <span className="font-mono text-3xl text-white">{countdown}</span>
+                <span className="font-mono text-t1" style={{ fontSize: '2.5rem', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{countdown}</span>
               </div>
             </>
           )}
@@ -147,7 +151,7 @@ export default function Calibration() {
           >
             <span className="text-label font-mono text-t4">LIVE METRICS</span>
             <div className="flex gap-4">
-              <span className="font-mono text-mono-sm text-t2">{livePitch}Hz</span>
+              <span className="font-mono text-mono-sm text-t2">{state === 'calibrating' ? `${livePitch}Hz` : '—Hz'}</span>
               <span className="font-mono text-mono-sm text-t2">{state === 'calibrating' ? `${liveWpm} WPM` : '— WPM'}</span>
             </div>
           </div>

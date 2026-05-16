@@ -49,6 +49,14 @@ export default function Interview() {
   const recognitionRef = useRef<any>(null)
   const questionWordsRef = useRef<string[]>([])
 
+  // Assign camera stream to video element once both are ready
+  useEffect(() => {
+    if (streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current
+      videoRef.current.play().catch(() => {})
+    }
+  }, [cameraStream])
+
   // Load questions + camera on mount
   useEffect(() => {
     const sid = sessionStorage.getItem('sessionId')
@@ -60,10 +68,6 @@ export default function Interview() {
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       .then(stream => {
         streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          videoRef.current.play().catch(() => {})
-        }
         setCameraStream(true)
       })
       .catch(() => { setCameraStream(false) })
@@ -282,14 +286,14 @@ export default function Interview() {
           >
             {formatTime(timeLeft)}
           </motion.span>
-          <GlowButton size="sm" variant="ghost" onClick={endInterview} className="text-t3 hover:text-danger text-body-sm">
+          <GlowButton size="sm" variant="ghost" onClick={() => { if (window.confirm('End interview early? Your current progress will be analyzed.')) endInterview() }} className="text-t3 hover:text-danger text-body-sm">
             End Interview
           </GlowButton>
         </div>
       </div>
 
       {/* Camera zone */}
-      <div className="relative overflow-hidden flex-shrink-0 bg-bg3" style={{ height: '48vh' }}>
+      <div className="relative overflow-hidden flex-shrink-0 bg-bg3" style={{ height: 'min(48vh, 340px)' }}>
         {/* Video fills absolutely — explicit width/height forces correct rendering */}
         <video
           ref={videoRef}
@@ -301,7 +305,7 @@ export default function Interview() {
             width: '100%', height: '100%',
             objectFit: 'cover',
             display: 'block',
-            background: '#000',
+            background: 'transparent',
           }}
         />
 
@@ -360,7 +364,7 @@ export default function Interview() {
               style={{ backgroundColor: 'rgba(239,68,68,0.06)' }}
             >
               <motion.p
-                className="text-label font-mono text-danger tracking-widest"
+                className="text-h3 font-mono text-danger tracking-widest"
                 animate={{ opacity: [0.6, 0.2, 0.6] }}
                 transition={{ duration: 2, repeat: Infinity }}
               >

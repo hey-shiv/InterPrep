@@ -83,7 +83,7 @@ function Hero({ onStartClick, onViewSessions }: { onStartClick: () => void; onVi
 
         {/* Headline — Playfair serif */}
         <FadeUp delay={0.1} className="mt-6">
-          <h1 className="font-serif text-t1" style={{ fontSize: 'clamp(3rem, 8vw, 6.5rem)', lineHeight: 1.02, letterSpacing: '-0.03em', fontWeight: 800 }}>
+          <h1 className="font-serif text-t1" style={{ fontSize: 'clamp(2.5rem, 7vw, 6.5rem)', lineHeight: 1.02, letterSpacing: '-0.03em', fontWeight: 800 }}>
             The Interview<br />
             <em style={{ color: '#5c4fff' }}>That Reads You.</em>
           </h1>
@@ -181,8 +181,7 @@ function PhaseChapter({
         <motion.div
           ref={ref} animate={controls} initial="hidden"
           variants={staggerContainer}
-          className={`grid grid-cols-2 gap-20 items-center ${reverse ? 'direction-reverse' : ''}`}
-          style={{ direction: reverse ? 'rtl' : 'ltr' }}
+          className={`grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-20 items-center ${reverse ? 'md:[direction:rtl]' : ''}`}
         >
           <motion.div variants={revealVariants} style={{ direction: 'ltr' }}>
             <span className="font-mono text-label uppercase tracking-widest" style={{ color: accentColor }}>{num} —</span>
@@ -200,7 +199,7 @@ function PhaseChapter({
               ))}
             </ul>
           </motion.div>
-          <motion.div variants={revealVariants} style={{ direction: 'ltr' }}>
+          <motion.div variants={revealVariants} style={{ direction: 'ltr' }} className="w-full">
             {visual}
           </motion.div>
         </motion.div>

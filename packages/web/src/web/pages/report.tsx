@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useLocation } from 'wouter'
 import {
@@ -56,7 +56,18 @@ function Section({ children, className = '' }: { children: React.ReactNode; clas
 
 function NervousnessHeatmap({ data }: { data: number[] }) {
   const { ref, controls, inView } = useScrollReveal()
-  const barData = data.length > 0 ? data : generateMockHeatmap()
+  // useMemo prevents Math.random() from re-running on every render
+  const barData = useMemo(() => data.length > 0 ? data : generateMockHeatmap(), [data])
+  const stats = useMemo(() => {
+    const avg = barData.reduce((a, b) => a + b, 0) / barData.length
+    const peakIdx = barData.reduce((best, v, i) => v > barData[best] ? i : best, 0)
+    const calmIdx = barData.reduce((best, v, i) => v < barData[best] ? i : best, 0)
+    const toTime = (idx: number) => {
+      const sec = Math.round((idx / barData.length) * 600)
+      return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
+    }
+    return { avg: avg.toFixed(2), peakTime: toTime(peakIdx), calmTime: toTime(calmIdx) }
+  }, [barData])
 
   return (
     <div ref={ref}>
@@ -78,11 +89,11 @@ function NervousnessHeatmap({ data }: { data: number[] }) {
           <span key={t} className="font-mono text-mono-sm text-t4">{t}</span>
         ))}
       </div>
-      <div className="flex gap-4 mt-4">
+      <div className="flex flex-wrap gap-3 mt-4">
         {[
-          `Peak: Q${Math.floor(Math.random() * 8) + 1} @ 2:14`,
-          `Calmest: Q${Math.floor(Math.random() * 8) + 1}`,
-          `Avg Stress: ${(barData.reduce((a, b) => a + b, 0) / barData.length).toFixed(2)}`,
+          `Peak stress @ ${stats.peakTime}`,
+          `Calmest @ ${stats.calmTime}`,
+          `Avg Stress: ${stats.avg}`,
         ].map(s => (
           <span key={s} className="bg-bg3 border border-border px-4 py-2 font-mono text-mono-sm text-t2" style={{ borderRadius: 2 }}>{s}</span>
         ))}
@@ -406,10 +417,11 @@ export default function Report() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-bg0 flex items-center justify-center">
-        <div className="max-w-sm w-full px-6">
+      <div className="min-h-screen w-full bg-bg0 flex flex-col items-center justify-center gap-6 px-4">
+        <div className="w-full max-w-sm">
           <AILoadingCard customMessages={['Analyzing your session...', 'Scoring each question...', 'Building your verdict...', 'Generating improvement plan...']} />
         </div>
+        <p className="font-mono text-mono-sm text-t4 text-center">This takes 15–30 seconds. Don't close the tab.</p>
       </div>
     )
   }

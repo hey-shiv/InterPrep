@@ -37,15 +37,19 @@ export default function Setup() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
 
+  // Assign stream to video once both are ready
+  useEffect(() => {
+    if (streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current
+      videoRef.current.play().catch(() => {})
+    }
+  }, [cameraOk])
+
   useEffect(() => {
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          videoRef.current.play().catch(() => {})
-        }
         setCameraOk(true)
         setMicOk(true)
         setTimeout(() => setFaceDetected(true), 1500)
@@ -133,7 +137,7 @@ export default function Setup() {
         {/* Step 1 — Role */}
         <section>
           <p className="text-label font-mono text-t3 uppercase tracking-widest mb-4">01  Role Selection</p>
-          <motion.div className="grid grid-cols-2 gap-3" variants={staggerContainer} initial="hidden" animate="visible">
+          <motion.div className="grid grid-cols-1 sm:grid-cols-2 gap-3" variants={staggerContainer} initial="hidden" animate="visible">
             {ROLES.map((role, i) => {
               const isSelected = selectedRole === role.id
               return (
