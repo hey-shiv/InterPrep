@@ -1,78 +1,60 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'wouter'
-import { Mic, MicOff, AlertTriangle } from 'lucide-react'
-import { GlowButton } from '../components/ui/GlowButton'
-import { WaveformVisualizer } from '../components/ui/WaveformVisualizer'
-import { EmotionOrb } from '../components/ui/EmotionOrb'
-import { LiveMetricBadge } from '../components/ui/LiveMetricBadge'
-import { SectionBadge } from '../components/ui/SectionBadge'
-import { wordReveal } from '../../lib/motion'
+import { AlertTriangle, ArrowRight, Mic, MicOff, Pause, Square } from 'lucide-react'
+import { Brand, StageNav } from '../components/brand'
 
-type Emotion = 'neutral' | 'confident' | 'nervous' | 'engaged' | 'confused'
 type InterviewState = 'loading' | 'question' | 'silence' | 'listening' | 'processing' | 'done'
-
-interface Question {
-  id: string; text: string; type: string; difficulty?: string
-}
+type Question = { id: string; text: string; type: string; difficulty?: string }
 
 const TOTAL_TIME = 10 * 60
 
-function formatTime(s: number) {
-  const m = Math.floor(s / 60)
-  const sec = s % 60
-  return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
+function formatTime(seconds: number) {
+  const minutes = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
 
 export default function Interview() {
   const [, setLocation] = useLocation()
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
-  const [currentQ, setCurrentQ] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [state, setState] = useState<InterviewState>('loading')
   const [timeLeft, setTimeLeft] = useState(TOTAL_TIME)
-  const [silenceCountdown, setSilenceCountdown] = useState(4)
-  const [emotion, setEmotion] = useState<Emotion>('neutral')
+  const [silenceLeft, setSilenceLeft] = useState(4)
+  const [currentAnswer, setCurrentAnswer] = useState('')
   const [wpm, setWpm] = useState(0)
   const [pitch, setPitch] = useState(0)
   const [fillers, setFillers] = useState(0)
-  const [currentAnswer, setCurrentAnswer] = useState('')
-  const [displayedWords, setDisplayedWords] = useState(0)
+  const [cameraOk, setCameraOk] = useState(false)
   const [sttAvailable, setSttAvailable] = useState(true)
-  const [sessionId, setSessionId] = useState<string | null>(null)
-  const [cameraStream, setCameraStream] = useState(false)
-
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const silenceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const silenceRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recognitionRef = useRef<any>(null)
-  const questionWordsRef = useRef<string[]>([])
 
-  // Assign camera stream to video element once both are ready
-  useEffect(() => {
-    if (streamRef.current && videoRef.current) {
-      videoRef.current.srcObject = streamRef.current
-      videoRef.current.play().catch(() => {})
-    }
-  }, [cameraStream])
-
-  // Load questions + camera on mount
   useEffect(() => {
     const sid = sessionStorage.getItem('sessionId')
     const sdata = sessionStorage.getItem('sessionData')
-    if (!sid) { setLocation('/setup'); return }
+    if (!sid) {
+      setLocation('/setup')
+      return
+    }
     setSessionId(sid)
 
-    // Start camera FIRST — give it time to warm up
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      .then(stream => {
+      .then(async stream => {
         streamRef.current = stream
-        setCameraStream(true)
+        setCameraOk(true)
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          await videoRef.current.play().catch(() => {})
+        }
       })
-      .catch(() => { setCameraStream(false) })
+      .catch(() => setCameraOk(false))
 
-    // Load questions async
     async function loadQuestions() {
       try {
         const parsed = sdata ? JSON.parse(sdata) : {}
@@ -82,75 +64,60 @@ export default function Interview() {
           body: JSON.stringify({ role: parsed.jobRole, resumeData: parsed.resumeAnalysis, sessionId: sid }),
         })
         const data = await res.json()
-        setQuestions(data.questions || getDefaultQuestions())
+        setQuestions(data.questions?.length ? data.questions : defaultQuestions())
       } catch {
-        setQuestions(getDefaultQuestions())
+        setQuestions(defaultQuestions())
       }
       setState('question')
-      startTimer()
+      startClock()
+      setTimeout(startSilenceWindow, 1200)
     }
-    loadQuestions()
 
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      setSttAvailable(false)
-    }
+    loadQuestions()
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) setSttAvailable(false)
 
     return () => {
-      streamRef.current?.getTracks().forEach(t => t.stop())
+      streamRef.current?.getTracks().forEach(track => track.stop())
       if (timerRef.current) clearInterval(timerRef.current)
-      if (silenceTimerRef.current) clearInterval(silenceTimerRef.current)
-      recognitionRef.current?.stop()
+      if (silenceRef.current) clearInterval(silenceRef.current)
+      recognitionRef.current?.stop?.()
     }
-  }, [])
+  }, [setLocation])
 
-  // Live metrics while listening
   useEffect(() => {
     if (state !== 'listening') return
     const interval = setInterval(() => {
-      setWpm(120 + Math.floor(Math.random() * 40))
-      setPitch(130 + Math.floor(Math.random() * 30))
-      setEmotion(['neutral', 'confident', 'engaged', 'nervous'][Math.floor(Math.random() * 4)] as Emotion)
-    }, 2000)
+      setPitch(130 + Math.floor(Math.random() * 34))
+      if (!currentAnswer) setWpm(115 + Math.floor(Math.random() * 44))
+    }, 1400)
     return () => clearInterval(interval)
-  }, [state])
+  }, [state, currentAnswer])
 
-  // Word reveal per question
-  useEffect(() => {
-    if (state !== 'question' || questions.length === 0) return
-    const q = questions[currentQ]
-    if (!q) return
-    const words = q.text.split(' ')
-    questionWordsRef.current = words
-    setDisplayedWords(0)
-    let i = 0
-    const interval = setInterval(() => {
-      i++
-      setDisplayedWords(i)
-      if (i >= words.length) {
-        clearInterval(interval)
-        setTimeout(() => startSilenceWindow(), 300)
-      }
-    }, 80)
-    return () => clearInterval(interval)
-  }, [currentQ, state, questions.length])
-
-  function startTimer() {
+  function startClock() {
     timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
-        if (prev <= 1) { clearInterval(timerRef.current!); endInterview(); return 0 }
+        if (prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current)
+          endInterview()
+          return 0
+        }
         return prev - 1
       })
     }, 1000)
   }
 
   function startSilenceWindow() {
+    if (silenceRef.current) clearInterval(silenceRef.current)
     setState('silence')
-    setSilenceCountdown(4)
-    let t = 4
-    silenceTimerRef.current = setInterval(() => {
-      t--
-      setSilenceCountdown(t)
-      if (t <= 0) { clearInterval(silenceTimerRef.current!); startListening() }
+    setSilenceLeft(4)
+    let remaining = 4
+    silenceRef.current = setInterval(() => {
+      remaining -= 1
+      setSilenceLeft(remaining)
+      if (remaining <= 0) {
+        if (silenceRef.current) clearInterval(silenceRef.current)
+        startListening()
+      }
     }, 1000)
   }
 
@@ -158,6 +125,8 @@ export default function Interview() {
     setState('listening')
     setCurrentAnswer('')
     setFillers(0)
+    setWpm(0)
+    setPitch(142)
     if (!sttAvailable) return
 
     const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
@@ -167,95 +136,90 @@ export default function Interview() {
     recognition.interimResults = true
     recognition.lang = 'en-US'
 
-    const fillerWords = ['um', 'uh', 'like', 'you know', 'basically', 'literally']
-    recognition.onresult = (e: any) => {
-      let full = ''
-      let fillerCount = 0
-      for (let i = 0; i < e.results.length; i++) {
-        const text = e.results[i][0].transcript
-        full += text + ' '
-        fillerWords.forEach(f => { if (text.toLowerCase().includes(f)) fillerCount++ })
+    recognition.onresult = (event: any) => {
+      let text = ''
+      for (let i = 0; i < event.results.length; i += 1) {
+        text += `${event.results[i][0].transcript} `
       }
-      setCurrentAnswer(full.trim())
+      const cleaned = text.trim()
+      const fillerCount = (cleaned.toLowerCase().match(/\b(um|uh|like|basically|literally)\b/g) || []).length
+      setCurrentAnswer(cleaned)
       setFillers(fillerCount)
-      setWpm(Math.round(full.trim().split(/\s+/).length * 6))
+      setWpm(cleaned ? Math.min(210, Math.round(cleaned.split(/\s+/).length * 6)) : 0)
     }
     recognition.start()
   }
 
-  const stopAnswering = useCallback(() => {
-    recognitionRef.current?.stop()
-    setState('processing')
-    const q = questions[currentQ]
-    const nextAnswers = q ? { ...answers, [q.id]: currentAnswer } : answers
+  const saveAndAdvance = useCallback((forcedAnswer?: string) => {
+    recognitionRef.current?.stop?.()
+    if (silenceRef.current) clearInterval(silenceRef.current)
+    const q = questions[currentIndex]
+    const nextAnswers = q ? { ...answers, [q.id]: forcedAnswer ?? currentAnswer } : answers
     setAnswers(nextAnswers)
+    setState('processing')
+
     setTimeout(() => {
-      if (currentQ < questions.length - 1) {
-        setCurrentQ(prev => prev + 1)
-        setState('question')
+      if (currentIndex < questions.length - 1) {
+        setCurrentIndex(prev => prev + 1)
         setCurrentAnswer('')
+        setState('question')
+        setTimeout(startSilenceWindow, 700)
       } else {
         endInterview(nextAnswers)
       }
-    }, 500)
-  }, [answers, currentQ, questions, currentAnswer])
+    }, 600)
+  }, [answers, currentAnswer, currentIndex, questions])
 
   async function endInterview(finalAnswers = answers) {
     if (timerRef.current) clearInterval(timerRef.current)
-    streamRef.current?.getTracks().forEach(t => t.stop())
+    if (silenceRef.current) clearInterval(silenceRef.current)
+    recognitionRef.current?.stop?.()
+    streamRef.current?.getTracks().forEach(track => track.stop())
     setState('done')
 
-    if (!sessionId) { setTimeout(() => setLocation('/report'), 1500); return }
-
-    try {
-      const payload = { answers: finalAnswers, questions, sessionId }
-      const res = await fetch('/api/ai/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        sessionStorage.setItem('reportData', JSON.stringify({
-          verdict: data.verdict || 'BORDERLINE',
-          score: data.score || data.metrics?.overall || 7.2,
-          debrief: data.debrief || 'Your interview has been analyzed.',
-          metrics: {
-            totalQuestions: data.metrics?.totalQuestions || data.questions?.length || questions.length || 8,
-            avgConfidence: data.metrics?.confidence || 6.8,
-            peakStress: data.metrics?.stress || 0.42,
-            bestMoment: data.metrics?.bestMoment || 'Q1',
-          },
-          questions: data.questions || [],
-          shadowQuestions: data.shadowQuestions || [],
-          improvementPlan: data.improvementPlan || [],
-          heatmapData: [],
-          voiceData: [],
-          verdictQuote: data.verdictQuote || 'You sounded most confident on the question you answered least accurately.',
-        }))
-      }
-    } catch {}
+    if (sessionId) {
+      try {
+        const res = await fetch('/api/ai/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers: finalAnswers, questions, sessionId }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          sessionStorage.setItem('reportData', JSON.stringify({
+            verdict: data.verdict || 'BORDERLINE',
+            score: data.score || data.metrics?.overall || 7.2,
+            debrief: data.debrief || 'Interview complete. Your report is ready.',
+            metrics: {
+              totalQuestions: data.metrics?.totalQuestions || data.questions?.length || questions.length || 8,
+              avgConfidence: data.metrics?.confidence || 6.5,
+              peakStress: data.metrics?.stress || 0.48,
+              bestMoment: data.metrics?.bestMoment || 'Q1',
+            },
+            questions: data.questions || [],
+            shadowQuestions: data.shadowQuestions || [],
+            improvementPlan: data.improvementPlan || [],
+            verdictQuote: data.verdictQuote || 'Your strongest answer was the one with the clearest structure.',
+          }))
+        }
+      } catch {}
+    }
 
     setLocation('/report')
   }
 
-  const q = questions[currentQ]
-  const qWords = q?.text.split(' ') || []
-  const progress = questions.length > 0 ? ((currentQ + 1) / questions.length) : 0
-  const timerColor = timeLeft < 60 ? 'text-danger' : timeLeft < 180 ? 'text-warning' : 'text-t1'
+  const q = questions[currentIndex]
+  const progress = questions.length ? ((currentIndex + 1) / questions.length) * 100 : 0
 
   if (state === 'loading') {
     return (
-      <div className="min-h-screen bg-bg0 flex items-center justify-center">
-        <div className="text-center">
-          <div className="flex gap-1.5 justify-center mb-4">
-            {[0, 1, 2].map(i => (
-              <motion.div key={i} className="w-2 h-2 bg-accent"
-                animate={{ scale: [1, 1.5, 1] }}
-                transition={{ duration: 0.6, delay: i * 0.15, repeat: Infinity }} />
-            ))}
+      <div className="app-page grid min-h-screen place-items-center">
+        <div className="panel p-8 text-center">
+          <div className="mx-auto mb-4 flex justify-center gap-2">
+            {[0, 1, 2].map(i => <span key={i} className="status-dot ok pulse-dot" style={{ animationDelay: `${i * 120}ms` }} />)}
           </div>
-          <p className="text-body text-t3 font-mono">Preparing your interview...</p>
+          <p className="text-xl font-bold text-t1">Preparing questions...</p>
+          <p className="body mt-1">Building your role-specific interview.</p>
         </div>
       </div>
     )
@@ -263,264 +227,146 @@ export default function Interview() {
 
   if (state === 'done') {
     return (
-      <div className="min-h-screen bg-bg0 flex items-center justify-center">
-        <div className="text-center">
-          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            className="w-20 h-20 bg-success/20 border-2 border-success flex items-center justify-center mx-auto mb-6"
-            style={{ borderRadius: 2 }}>
-            <span className="text-display-md font-bold text-success">✓</span>
-          </motion.div>
-          <p className="text-h1 text-t1 font-bold mb-2">Interview Complete</p>
-          <p className="text-body text-t3">Generating your report...</p>
+      <div className="app-page grid min-h-screen place-items-center">
+        <div className="panel p-8 text-center">
+          <CheckIcon />
+          <p className="mt-4 text-2xl font-bold text-t1">Interview complete</p>
+          <p className="body mt-1">Scoring answers and opening your report.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="h-screen bg-bg0 flex flex-col overflow-hidden">
-      {/* Top bar */}
-      <div className="h-12 bg-bg0 border-b border-border-sub flex items-center justify-between px-8 flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <span className="font-mono text-mono-sm text-t3">Q{currentQ + 1} / {questions.length || 8}</span>
-          <div className="w-24 h-0.5 bg-border overflow-hidden">
-            <motion.div className="h-full bg-accent" animate={{ width: `${progress * 100}%` }} transition={{ duration: 0.4 }} />
+    <div className="app-page h-screen overflow-hidden">
+      <header className="border-b border-border-sub bg-bg0/92">
+        <div className="flex h-16 items-center justify-between gap-5 px-6">
+          <div className="flex min-w-0 items-center gap-4">
+            <Brand compact />
+            <span className="chip"><span className="status-dot bad pulse-dot" /> Live</span>
+            <span className="font-mono text-sm text-t2">Question {currentIndex + 1} of {questions.length || 8}</span>
+            <div className="bar w-44"><span style={{ width: `${progress}%` }} /></div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="hidden xl:block"><StageNav active={2} /></div>
+            <span className={timeLeft < 60 ? 'font-mono text-2xl text-danger' : 'font-mono text-2xl text-t1'}>{formatTime(timeLeft)}</span>
+            <button className="btn btn-danger" onClick={() => { if (window.confirm('End interview now?')) endInterview() }}>
+              <Square size={15} /> End
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="animate-ping-slow absolute inline-flex h-full w-full rounded-full bg-danger opacity-75" />
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-danger" />
-          </span>
-          <span className="text-label font-mono text-danger">PHASE 2 · LIVE</span>
-        </div>
-        <div className="flex items-center gap-6">
-          <motion.span
-            className={`font-mono text-h2 ${timerColor}`}
-            animate={timeLeft < 60 ? { opacity: [1, 0.6, 1] } : {}}
-            transition={timeLeft < 60 ? { duration: 1, repeat: Infinity } : {}}
-          >
-            {formatTime(timeLeft)}
-          </motion.span>
-          <GlowButton size="sm" variant="ghost" onClick={() => { if (window.confirm('End interview early? Your current progress will be analyzed.')) endInterview() }} className="text-t3 hover:text-danger text-body-sm">
-            End Interview
-          </GlowButton>
-        </div>
-      </div>
+      </header>
 
-      {/* Camera zone */}
-      <div className="relative overflow-hidden flex-shrink-0 bg-bg3" style={{ height: 'min(48vh, 340px)' }}>
-        {/* Video fills absolutely — explicit width/height forces correct rendering */}
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          style={{
-            position: 'absolute', inset: 0,
-            width: '100%', height: '100%',
-            objectFit: 'cover',
-            display: 'block',
-            background: 'transparent',
-          }}
-        />
-
-        {/* Camera off placeholder */}
-        {!cameraStream && (
-          <div className="absolute inset-0 flex items-center justify-center bg-bg3">
-            <div className="text-center">
-              <MicOff size={32} className="text-t3 mx-auto mb-2" />
-              <p className="text-body-sm text-t3 font-mono">Camera unavailable</p>
+      <main className="grid h-[calc(100vh-64px)] grid-cols-[1fr_420px]">
+        <section className="grid grid-rows-[1fr_auto] overflow-hidden">
+          <div className="flex items-center p-10">
+            <div className="max-w-4xl">
+              <div className="mb-5 flex flex-wrap items-center gap-2">
+                <span className="chip">{q?.type || 'Technical'}</span>
+                {q?.difficulty && <span className="chip">{q.difficulty}</span>}
+                {state === 'silence' && <span className="chip text-warning"><Pause size={13} /> Composure window {silenceLeft}s</span>}
+                {state === 'listening' && <span className="chip text-success"><Mic size={13} /> Listening</span>}
+                {state === 'processing' && <span className="chip">Saving answer...</span>}
+              </div>
+              <h1 className="text-5xl font-bold leading-tight text-t1">{q?.text}</h1>
+              <p className="body-lg mt-5 max-w-2xl">
+                Answer out loud. Be structured. If speech recognition is unavailable, type your answer in the transcript box.
+              </p>
             </div>
           </div>
-        )}
 
-        {/* Dark overlay — transparent to not block camera */}
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.4) 100%)' }} />
-
-        {/* TL — Emotion */}
-        <div className="absolute top-4 left-4 pointer-events-none">
-          <EmotionOrb emotion={emotion} />
-        </div>
-
-        {/* TR — Live metrics */}
-        <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-none">
-          <LiveMetricBadge icon={<Mic size={14} />} value={wpm > 0 ? `${wpm} WPM` : '— WPM'} />
-          <LiveMetricBadge icon={<span style={{ fontSize: 12 }}>Hz</span>} value={pitch > 0 ? `±${Math.abs(pitch - 142)}Hz` : '—'} />
-          <LiveMetricBadge icon={<AlertTriangle size={14} />} value={`${fillers} fillers`} danger={fillers > 5} />
-        </div>
-
-        {/* Left pitch bar */}
-        <div className="absolute left-0 top-0 bottom-0 w-1" style={{
-          background: pitch > 160 ? 'linear-gradient(to bottom, #EF4444, transparent)' : pitch > 140 ? 'linear-gradient(to bottom, #5c4fff, transparent)' : 'linear-gradient(to bottom, #0EA5E9, transparent)',
-        }} />
-
-        {/* Transcript bar */}
-        <div
-          className="absolute bottom-0 left-0 right-0 h-12 flex items-center px-4 gap-3 border-t border-border-sub/50"
-          style={{ backgroundColor: 'rgba(10,10,10,0.88)', backdropFilter: 'blur(8px)' }}
-        >
-          <span className="text-label font-mono text-t4 mr-3 flex-shrink-0">TRANSCRIPT</span>
-          <span className="font-mono text-mono-sm text-t2 truncate flex-1">
-            {currentAnswer || (state === 'listening' ? 'Listening...' : '')}
-          </span>
-          {fillers > 0 && (
-            <span className="flex-shrink-0 font-mono text-mono-sm text-warning border border-warning/30 px-2 py-0.5" style={{ borderRadius: 2 }}>
-              {fillers} fillers
-            </span>
-          )}
-        </div>
-
-        {/* Silence overlay */}
-        <AnimatePresence>
-          {state === 'silence' && (
-            <motion.div
-              className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              style={{ backgroundColor: 'rgba(239,68,68,0.06)' }}
-            >
-              <motion.p
-                className="text-h3 font-mono text-danger tracking-widest"
-                animate={{ opacity: [0.6, 0.2, 0.6] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                HOLD YOUR COMPOSURE
-              </motion.p>
-              <p className="font-mono text-3xl text-danger/60 mt-3">{silenceCountdown}</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Question zone */}
-      <div className="flex-1 overflow-y-auto bg-bg1">
-        <div className="max-w-3xl mx-auto px-8 py-6 w-full">
-          {q && (
-            <>
-              <div className="flex justify-between items-center mb-5">
-                <span className="font-mono text-mono-sm bg-bg3 border border-border px-3 py-1 text-t2" style={{ borderRadius: 2 }}>Q{currentQ + 1}</span>
-                <SectionBadge variant="time" label={q.type || 'Technical'} />
-              </div>
-
-              {/* Question — word reveal */}
-              <div className="text-h1 text-t1 leading-[1.4] mb-4 flex flex-wrap gap-x-2">
-                {qWords.map((word, i) => (
-                  <motion.span key={`${currentQ}-${i}`} custom={i} variants={wordReveal} initial="hidden" animate={i < displayedWords ? 'visible' : 'hidden'}>
-                    {word}
-                  </motion.span>
-                ))}
-              </div>
-
-              {/* Silence countdown bar */}
-              <AnimatePresence>
-                {state === 'silence' && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mb-4">
-                    <div className="h-0.5 bg-border overflow-hidden mb-1">
-                      <motion.div className="h-full bg-danger" initial={{ width: '100%' }} animate={{ width: '0%' }} transition={{ duration: 4, ease: 'linear' }} />
-                    </div>
-                    <p className="text-label font-mono text-t4">COMPOSURE WINDOW</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <div className="border-t border-border-sub my-5" />
-
-              {/* Answer area */}
-              <div className="min-h-20">
-                {state === 'listening' && sttAvailable && (
-                  <div>
-                    <div className="flex items-center gap-3 mb-4">
-                      <WaveformVisualizer active />
-                      <span className="text-body-sm text-t3">Listening...</span>
-                    </div>
-                    {currentAnswer && (
-                      <div className="bg-bg2 p-4 border border-border-sub text-body text-t1 min-h-16" style={{ borderRadius: 2 }}>
-                        {currentAnswer.split(' ').map((word, i) => {
-                          const isFiller = ['um', 'uh', 'like', 'you know', 'basically', 'literally'].includes(word.toLowerCase())
-                          return (
-                            <span key={i}>
-                              {isFiller
-                                ? <span className="px-1 mx-0.5" style={{ backgroundColor: 'rgba(245,158,11,0.20)', color: '#F59E0B' }}>{word}</span>
-                                : <span>{word} </span>
-                              }
-                            </span>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {state === 'listening' && !sttAvailable && (
+          <div className="border-t border-border-sub bg-bg1 p-6">
+            <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+              <div className="panel-soft min-h-28 p-4">
+                <p className="eyebrow">Transcript</p>
+                {sttAvailable ? (
+                  <p className="body mt-2 text-t1">{currentAnswer || (state === 'listening' ? 'Listening...' : 'Transcript appears here when your answer starts.')}</p>
+                ) : (
                   <textarea
-                    className="w-full h-32 resize-none text-body text-t1 p-4 border border-border focus:border-accent outline-none transition-colors"
-                    style={{ backgroundColor: '#141414', borderRadius: 2 }}
+                    className="mt-3 h-24 w-full resize-none rounded-[8px] border border-border bg-bg0 p-3 text-t1 outline-none"
                     placeholder="Type your answer here..."
                     value={currentAnswer}
-                    onChange={e => setCurrentAnswer(e.target.value)}
+                    onChange={event => setCurrentAnswer(event.target.value)}
                   />
                 )}
-
-                {state === 'question' && displayedWords < qWords.length && (
-                  <div className="h-16 flex items-center">
-                    <div className="flex gap-1.5">
-                      {[0, 1, 2].map(i => (
-                        <motion.div key={i} className="w-1.5 h-1.5 bg-accent"
-                          animate={{ scale: [1, 1.5, 1] }}
-                          transition={{ duration: 0.6, delay: i * 0.15, repeat: Infinity }} />
-                      ))}
-                    </div>
-                  </div>
+              </div>
+              <div className="flex items-end gap-3">
+                {(state === 'listening' || !sttAvailable) && (
+                  <button className="btn btn-primary" onClick={() => saveAndAdvance()}>
+                    Done Speaking <ArrowRight size={17} />
+                  </button>
+                )}
+                {state !== 'processing' && (
+                  <button className="btn btn-secondary" onClick={() => saveAndAdvance('')}>
+                    Skip
+                  </button>
                 )}
               </div>
+            </div>
+          </div>
+        </section>
 
-              <div className="border-t border-border-sub my-5" />
-
-              {/* Bottom metrics */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                {[
-                  { label: 'Filler Words', value: fillers, color: fillers > 5 ? 'text-danger' : fillers > 2 ? 'text-warning' : 'text-success' },
-                  { label: 'Eye Contact', value: 'OK', color: 'text-success' },
-                  { label: 'Response Time', value: state === 'silence' ? `${4 - silenceCountdown}s` : '—', color: 'text-t2' },
-                ].map(m => (
-                  <div key={m.label} className="text-center">
-                    <p className={`font-mono text-h1 ${m.color}`}>{m.value}</p>
-                    <p className="text-label font-mono text-t3 mt-1">{m.label}</p>
-                  </div>
-                ))}
+        <aside className="border-l border-border-sub bg-bg0 p-5">
+          <div className="camera-box">
+            <video ref={videoRef} autoPlay playsInline muted />
+            {!cameraOk && (
+              <div className="absolute inset-0 grid place-items-center text-center">
+                <div>
+                  <MicOff className="mx-auto text-t3" />
+                  <p className="body mt-2">Camera unavailable</p>
+                </div>
               </div>
+            )}
+            <span className="chip absolute left-4 top-4"><span className={`status-dot ${cameraOk ? 'ok' : 'bad'}`} /> camera</span>
+          </div>
 
-              <div className="flex justify-end gap-3">
-                {state === 'listening' && (
-                  <GlowButton variant="secondary" onClick={stopAnswering}>I'm Done Speaking</GlowButton>
-                )}
-                {(state === 'question' || state === 'silence') && currentQ < (questions.length - 1) && (
-                  <GlowButton variant="ghost" size="sm" onClick={() => {
-                    clearInterval(silenceTimerRef.current!)
-                    setCurrentQ(prev => prev + 1)
-                    setState('question')
-                  }}>
-                    Skip Question
-                  </GlowButton>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="metric">
+              <p className="metric-value text-success">{wpm || '-'}</p>
+              <p className="metric-label">WPM</p>
+            </div>
+            <div className="metric">
+              <p className="metric-value text-accent">{pitch ? `+${Math.abs(pitch - 142)}` : '-'}</p>
+              <p className="metric-label">Pitch delta</p>
+            </div>
+            <div className="metric">
+              <p className={fillers > 4 ? 'metric-value text-danger' : 'metric-value text-warning'}>{fillers}</p>
+              <p className="metric-label">Fillers</p>
+            </div>
+            <div className="metric">
+              <p className="metric-value text-t1">{state === 'silence' ? `${4 - silenceLeft}s` : '-'}</p>
+              <p className="metric-label">Response gap</p>
+            </div>
+          </div>
+
+          <div className="panel mt-4 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <AlertTriangle size={16} className="text-warning" />
+              <p className="font-bold text-t1">Interviewer note</p>
+            </div>
+            <p className="body">The report will judge the structure of the answer, the confidence you projected, and whether the details backed it up.</p>
+          </div>
+        </aside>
+      </main>
     </div>
   )
 }
 
-function getDefaultQuestions(): Question[] {
+function CheckIcon() {
+  return (
+    <div className="mx-auto grid h-16 w-16 place-items-center rounded-[8px] bg-success text-bg0">
+      <ArrowRight size={30} />
+    </div>
+  )
+}
+
+function defaultQuestions(): Question[] {
   return [
-    { id: 'q1', text: 'Tell me about a time you had to debug a complex production issue under pressure. What was your approach?', type: 'Behavioral' },
-    { id: 'q2', text: 'How would you design a URL shortener service that handles 100 million requests per day?', type: 'System Design' },
-    { id: 'q3', text: 'Walk me through how you would optimize a slow database query causing timeouts in production.', type: 'Technical' },
-    { id: 'q4', text: 'Describe your experience with distributed systems. What consistency models have you worked with?', type: 'Technical' },
-    { id: 'q5', text: 'Tell me about a project where you had to make a significant technical tradeoff. What did you choose and why?', type: 'Behavioral' },
-    { id: 'q6', text: 'How do you approach code reviews? What do you look for and how do you handle disagreements?', type: 'Behavioral' },
-    { id: 'q7', text: 'Implement a function that finds the longest substring without repeating characters.', type: 'Coding' },
-    { id: 'q8', text: "Where do you see the gap between your current skills and what this role requires? Be honest.", type: 'Resume' },
+    { id: 'q1', text: 'Tell me about a production issue you debugged under pressure. What did you do first?', type: 'Behavioral', difficulty: 'medium' },
+    { id: 'q2', text: 'Design a URL shortener that can handle 100 million requests per day.', type: 'System Design', difficulty: 'hard' },
+    { id: 'q3', text: 'How would you optimize a slow database query that is causing timeouts?', type: 'Technical', difficulty: 'medium' },
+    { id: 'q4', text: 'Walk me through a technical tradeoff you made and what you gave up.', type: 'Behavioral', difficulty: 'medium' },
+    { id: 'q5', text: 'How do you reason about consistency in distributed systems?', type: 'Technical', difficulty: 'hard' },
+    { id: 'q6', text: 'What is the weakest part of your resume for this role?', type: 'Resume', difficulty: 'medium' },
   ]
 }

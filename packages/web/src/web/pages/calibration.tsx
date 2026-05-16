@@ -1,208 +1,156 @@
-import { useState, useRef, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'wouter'
-import { Mic, Check } from 'lucide-react'
-import { PhaseProgressBar } from '../components/ui/PhaseProgressBar'
-import { PhaseLabel } from '../components/ui/PhaseLabel'
-import { GlowButton } from '../components/ui/GlowButton'
-import { DifferentiatorBox } from '../components/ui/DifferentiatorBox'
+import { ArrowLeft, ArrowRight, CheckCircle2, Mic, Video } from 'lucide-react'
+import { Brand, StageNav } from '../components/brand'
 
-type CalibState = 'idle' | 'calibrating' | 'done'
+type CalibState = 'ready' | 'running' | 'complete'
 
 export default function Calibration() {
   const [, setLocation] = useLocation()
-  const [state, setState] = useState<CalibState>('idle')
-  const [countdown, setCountdown] = useState(30)
+  const [state, setState] = useState<CalibState>('ready')
+  const [seconds, setSeconds] = useState(20)
   const [cameraOk, setCameraOk] = useState(false)
   const [micOk, setMicOk] = useState(false)
-  const [voiceBaseline, setVoiceBaseline] = useState<string | null>(null)
-  const [faceBaseline, setFaceBaseline] = useState<string | null>(null)
-  const [livePitch, setLivePitch] = useState(142)
-  const [liveWpm, setLiveWpm] = useState(0)
+  const [pitch, setPitch] = useState(142)
+  const [pace, setPace] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Assign stream to video once both ready
   useEffect(() => {
-    if (streamRef.current && videoRef.current) {
-      videoRef.current.srcObject = streamRef.current
-      videoRef.current.play().catch(() => {})
-    }
-  }, [cameraOk])
-
-  useEffect(() => {
-    async function startCamera() {
+    async function startMedia() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         streamRef.current = stream
         setCameraOk(true)
         setMicOk(true)
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          await videoRef.current.play().catch(() => {})
+        }
       } catch {}
     }
-    startCamera()
+    startMedia()
     return () => {
-      streamRef.current?.getTracks().forEach(t => t.stop())
+      streamRef.current?.getTracks().forEach(track => track.stop())
       if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [])
 
-  const startCalibration = () => {
-    setState('calibrating')
-    setCountdown(30)
-    let t = 30
+  function startCalibration() {
+    setState('running')
+    setSeconds(20)
+    let remaining = 20
     timerRef.current = setInterval(() => {
-      t--
-      setCountdown(t)
-      setLivePitch(140 + Math.floor(Math.random() * 10))
-      setLiveWpm(120 + Math.floor(Math.random() * 30))
-      if (t <= 0) {
-        clearInterval(timerRef.current!)
-        setState('done')
-        setVoiceBaseline('142Hz avg')
-        setFaceBaseline('Neutral detected')
+      remaining -= 1
+      setSeconds(remaining)
+      setPitch(134 + Math.floor(Math.random() * 22))
+      setPace(112 + Math.floor(Math.random() * 36))
+      if (remaining <= 0) {
+        if (timerRef.current) clearInterval(timerRef.current)
+        setState('complete')
+        setPitch(142)
+        setPace(126)
       }
     }, 1000)
   }
 
-  const handleContinue = () => {
-    streamRef.current?.getTracks().forEach(t => t.stop())
+  function continueToInterview() {
+    streamRef.current?.getTracks().forEach(track => track.stop())
     setLocation('/interview')
   }
 
-  const statusItems = [
-    { label: 'Camera access', done: cameraOk },
-    { label: 'Microphone access', done: micOk },
-    { label: 'Voice baseline', done: !!voiceBaseline, value: voiceBaseline },
-    { label: 'Face baseline', done: !!faceBaseline, value: faceBaseline },
-  ]
+  const progress = state === 'running' ? ((20 - seconds) / 20) * 100 : state === 'complete' ? 100 : 0
 
   return (
-    <div className="min-h-screen bg-bg1">
-      <PhaseProgressBar currentPhase={1} />
-
-      <div className="max-w-[680px] mx-auto px-6 pb-24">
-        {/* Header */}
-        <div className="py-12">
-          <PhaseLabel phase="entry" text="PHASE 1 — CALIBRATION" />
-          <h1 className="font-serif text-t1 mt-3" style={{ fontSize: '2.5rem', fontWeight: 800, letterSpacing: 0 }}>
-            Establishing Your Baseline
-          </h1>
-          <p className="text-body-lg text-t2 mt-3" style={{ lineHeight: 1.7 }}>
-            30 seconds. Say your name and where you're from.<br />
-            Speak naturally. Don't perform.
-          </p>
-        </div>
-
-        {/* Camera */}
-        <div className="aspect-video border border-border overflow-hidden relative bg-bg3" style={{ borderRadius: 2 }}>
-          <video
-            ref={videoRef} autoPlay playsInline muted
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-
-          {state === 'idle' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-bg3/60">
-              <motion.div
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                className="w-16 h-16 border-2 border-border flex items-center justify-center"
-                style={{ borderRadius: 2 }}
-              >
-                <Mic size={28} className="text-t3" />
-              </motion.div>
-            </div>
-          )}
-
-          {state === 'calibrating' && (
-            <>
-              <div className="absolute top-4 left-4">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 text-label font-mono uppercase border" style={{ borderRadius: 2, backgroundColor: '#1a0606', borderColor: '#7a1010', color: '#EF4444' }}>
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping-slow absolute inline-flex h-full w-full rounded-full bg-danger opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-danger" />
-                  </span>
-                  CALIBRATING
-                </span>
-              </div>
-              <div className="absolute top-4 right-4">
-                <span className="font-mono text-t1" style={{ fontSize: '2.5rem', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{countdown}</span>
-              </div>
-            </>
-          )}
-
-          {state === 'done' && (
-            <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: 'rgba(34,197,94,0.06)' }}>
-              <motion.div
-                initial={{ scale: 0 }} animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                className="w-16 h-16 bg-success flex items-center justify-center"
-                style={{ borderRadius: 2 }}
-              >
-                <Check size={32} className="text-white" />
-              </motion.div>
-            </div>
-          )}
-
-          {/* Bottom metrics bar */}
-          <div
-            className="absolute bottom-0 left-0 right-0 h-10 flex items-center justify-between px-4 border-t border-border-sub/50"
-            style={{ backgroundColor: 'rgba(10,10,10,0.88)', backdropFilter: 'blur(8px)' }}
-          >
-            <span className="text-label font-mono text-t4">LIVE METRICS</span>
-            <div className="flex gap-4">
-              <span className="font-mono text-mono-sm text-t2">{state === 'calibrating' ? `${livePitch}Hz` : '—Hz'}</span>
-              <span className="font-mono text-mono-sm text-t2">{state === 'calibrating' ? `${liveWpm} WPM` : '— WPM'}</span>
-            </div>
+    <div className="app-page">
+      <header className="app-topbar">
+        <div className="app-nav">
+          <Brand />
+          <StageNav active={1} />
+          <div className="flex items-center gap-3">
+            <button className="btn btn-ghost" onClick={() => setLocation('/setup')}>
+              <ArrowLeft size={17} /> Setup
+            </button>
+            <button className="btn btn-primary" disabled={state !== 'complete'} onClick={continueToInterview}>
+              Start Interview <ArrowRight size={17} />
+            </button>
           </div>
         </div>
+      </header>
 
-        {/* Status card */}
-        <div className="mt-6 bg-bg2 border border-border" style={{ borderRadius: 2 }}>
-          <div className="divide-y" style={{ borderColor: '#1e1e1e' }}>
-            {statusItems.map(item => (
-              <div key={item.label} className="px-5 py-3.5 flex items-center justify-between" style={{ borderColor: '#1e1e1e' }}>
-                <span className="text-body text-t2">{item.label}</span>
-                <div className="flex items-center gap-2">
-                  {item.value && <span className="font-mono text-mono-sm text-success">{item.value}</span>}
-                  <div className={`w-2 h-2 ${item.done ? 'bg-success' : 'border border-border'}`} />
+      <main className="app-container grid min-h-[calc(100vh-72px)] items-center gap-6 py-8 lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="panel overflow-hidden">
+          <div className="camera-box aspect-[16/9] border-0">
+            <video ref={videoRef} autoPlay playsInline muted />
+            {!cameraOk && (
+              <div className="absolute inset-0 grid place-items-center text-center">
+                <p className="body">Camera is starting...</p>
+              </div>
+            )}
+            <div className="absolute left-5 top-5 flex gap-2">
+              <span className="chip"><span className={`status-dot ${cameraOk ? 'ok' : 'warn'}`} /> camera</span>
+              <span className="chip"><span className={`status-dot ${micOk ? 'ok' : 'warn'}`} /> mic</span>
+            </div>
+            {state === 'running' && (
+              <div className="absolute right-5 top-5 rounded-[8px] bg-bg0/80 px-5 py-3 text-right backdrop-blur">
+                <p className="font-mono text-4xl text-t1">{seconds}</p>
+                <p className="metric-label">seconds</p>
+              </div>
+            )}
+            {state === 'complete' && (
+              <div className="absolute inset-0 grid place-items-center bg-bg0/50 backdrop-blur-sm">
+                <div className="panel p-6 text-center">
+                  <CheckCircle2 size={44} className="mx-auto text-success" />
+                  <p className="mt-3 text-2xl font-bold text-t1">Baseline saved</p>
+                  <p className="body mt-1">The interview will compare live signals against this reference.</p>
                 </div>
               </div>
-            ))}
+            )}
           </div>
-        </div>
+        </section>
 
-        <p className="text-center text-body-sm text-t2 italic mt-4">
-          Say: "My name is [name] and I'm from [city]." Speak naturally.
-        </p>
+        <aside className="grid gap-6">
+          <div>
+            <p className="eyebrow">Step 2 of 4</p>
+            <h1 className="page-title mt-2">Build your baseline.</h1>
+            <p className="body-lg mt-3">Read the prompt naturally for 20 seconds. This gives the report a reference point for voice and composure.</p>
+          </div>
 
-        <div className="mt-6">
-          <DifferentiatorBox
-            label="WHY THIS EXISTS"
-            text="Every metric during the interview is measured against this baseline. Without it, we'd be measuring stress in a vacuum. The calibration is not optional — it is the science."
-          />
-        </div>
+          <div className="panel p-5">
+            <p className="eyebrow">Prompt</p>
+            <p className="mt-3 text-2xl font-bold leading-snug text-t1">
+              “My name is [name]. I’m interviewing for this role because I want to build reliable products with a strong team.”
+            </p>
+            <div className="bar mt-5"><span style={{ width: `${progress}%` }} /></div>
+          </div>
 
-        <div className="mt-8">
-          <AnimatePresence mode="wait">
-            {state === 'idle' && (
-              <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <GlowButton size="lg" fullWidth onClick={startCalibration} disabled={!cameraOk}>Begin Calibration</GlowButton>
-              </motion.div>
-            )}
-            {state === 'calibrating' && (
-              <motion.div key="calibrating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <GlowButton size="lg" fullWidth loading>Calibrating...</GlowButton>
-              </motion.div>
-            )}
-            {state === 'done' && (
-              <motion.div key="done" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-                <GlowButton size="lg" fullWidth onClick={handleContinue}>Start Interview →</GlowButton>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="metric">
+              <Mic className="mb-3 text-success" size={20} />
+              <p className="metric-value">{pitch}Hz</p>
+              <p className="metric-label">Voice baseline</p>
+            </div>
+            <div className="metric">
+              <Video className="mb-3 text-accent" size={20} />
+              <p className="metric-value">{pace || '-'} WPM</p>
+              <p className="metric-label">Natural pace</p>
+            </div>
+          </div>
+
+          {state === 'ready' && (
+            <button className="btn btn-primary" disabled={!cameraOk || !micOk} onClick={startCalibration}>
+              Begin Calibration <ArrowRight size={17} />
+            </button>
+          )}
+          {state === 'running' && <button className="btn btn-secondary" disabled>Recording baseline...</button>}
+          {state === 'complete' && (
+            <button className="btn btn-primary" onClick={continueToInterview}>
+              Enter Interview <ArrowRight size={17} />
+            </button>
+          )}
+        </aside>
+      </main>
     </div>
   )
 }
