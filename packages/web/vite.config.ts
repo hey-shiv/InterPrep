@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
 	Object.assign(process.env, env);
 
 	return {
-		plugins: [honoDevPlugin(), react(), runableAnalyticsPlugin(), tailwind()],
+		plugins: [mode !== 'production' ? honoDevPlugin() : null, react(), runableAnalyticsPlugin(), tailwind()].filter(Boolean),
 		resolve: {
 			alias: {
 				"@": path.resolve(__dirname, "./src/web"),
