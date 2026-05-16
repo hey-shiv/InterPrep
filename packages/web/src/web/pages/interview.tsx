@@ -48,10 +48,16 @@ export default function Interview() {
       .then(async stream => {
         streamRef.current = stream
         setCameraOk(true)
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          await videoRef.current.play().catch(() => {})
+        // Retry assigning stream in case videoRef wasn't ready yet
+        const assignStream = async () => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream
+            await videoRef.current.play().catch(() => {})
+          } else {
+            setTimeout(assignStream, 100)
+          }
         }
+        assignStream()
       })
       .catch(() => setCameraOk(false))
 
@@ -83,6 +89,14 @@ export default function Interview() {
       recognitionRef.current?.stop?.()
     }
   }, [setLocation])
+
+  // Re-attach stream to video element whenever it becomes available
+  useEffect(() => {
+    if (streamRef.current && videoRef.current && !videoRef.current.srcObject) {
+      videoRef.current.srcObject = streamRef.current
+      videoRef.current.play().catch(() => {})
+    }
+  })
 
   useEffect(() => {
     if (state !== 'listening') return

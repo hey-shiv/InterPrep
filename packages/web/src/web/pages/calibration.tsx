@@ -24,10 +24,15 @@ export default function Calibration() {
         streamRef.current = stream
         setCameraOk(true)
         setMicOk(true)
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          await videoRef.current.play().catch(() => {})
+        const assignStream = async () => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream
+            await videoRef.current.play().catch(() => {})
+          } else {
+            setTimeout(assignStream, 100)
+          }
         }
+        assignStream()
       } catch {}
     }
     startMedia()
