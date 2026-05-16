@@ -389,7 +389,8 @@ export default function Report() {
 
         const metrics = typeof s.metrics === 'string' ? JSON.parse(s.metrics) : (s.metrics || {})
         const questions = typeof s.questions === 'string' ? JSON.parse(s.questions) : (s.questions || [])
-        const ra = typeof s.resumeAnalysis === 'string' ? JSON.parse(s.resumeAnalysis) : (s.resumeAnalysis || {})
+        const shadowQuestions = typeof s.shadowQuestions === 'string' ? JSON.parse(s.shadowQuestions) : (s.shadowQuestions || [])
+        const improvementPlan = typeof s.improvementPlan === 'string' ? JSON.parse(s.improvementPlan) : (s.improvementPlan || [])
 
         // If analyze hasn't written verdict yet, keep polling
         if (!s.verdict && attempts < maxAttempts) { setTimeout(poll, 2000); return }
@@ -399,12 +400,12 @@ export default function Report() {
           score: metrics.overall || 7.2,
           debrief: s.debrief || 'You demonstrated solid technical knowledge but struggled to quantify your impact.',
           metrics: { totalQuestions: questions.length || 8, avgConfidence: metrics.confidence || 6.8, peakStress: metrics.stress || 0.71, bestMoment: metrics.bestMoment || 'Q4' },
-          questions: ra.questions || [],
-          shadowQuestions: ra.shadowQuestions || [],
-          improvementPlan: ra.improvementPlan || [],
-          heatmapData: ra.heatmapData || [],
-          voiceData: ra.voiceData || [],
-          verdictQuote: ra.verdictQuote || 'You sounded most confident on the question you answered least accurately.',
+          questions,
+          shadowQuestions,
+          improvementPlan,
+          heatmapData: [],
+          voiceData: [],
+          verdictQuote: 'You sounded most confident on the question you answered least accurately.',
         })
         setLoading(false)
       } catch {
@@ -444,7 +445,7 @@ export default function Report() {
               className="inline-flex items-center border-2 px-10 py-5"
               style={{ borderRadius: 2, borderColor: vs.border, backgroundColor: vs.bg, boxShadow: vs.shadow }}
             >
-              <span className="font-serif font-bold" style={{ fontSize: '3rem', color: vs.text, letterSpacing: '-0.02em' }}>
+              <span className="font-serif font-bold" style={{ fontSize: '3rem', color: vs.text, letterSpacing: 0 }}>
                 {report.verdict}
               </span>
             </motion.div>
@@ -491,7 +492,7 @@ export default function Report() {
         <div className="max-w-5xl mx-auto px-8">
           <Section>
             <PhaseLabel text="01  NERVOUSNESS HEATMAP" />
-            <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: '-0.02em' }}>When You Were Most Exposed</h2>
+            <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: 0 }}>When You Were Most Exposed</h2>
             <p className="text-body-lg text-t2 mt-3 mb-10">Every second of the session. Stress mapped against your baseline.</p>
           </Section>
           <NervousnessHeatmap data={report.heatmapData} />
@@ -508,7 +509,7 @@ export default function Report() {
       <div className="py-24 max-w-5xl mx-auto px-8 border-b" style={{ borderColor: '#1e1e1e' }}>
         <Section>
           <PhaseLabel text="02  VOICE ANALYSIS" />
-          <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Your Voice on the Record</h2>
+          <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: 0 }}>Your Voice on the Record</h2>
           <p className="text-body-lg text-t2 mt-3 mb-10">Pitch vs calibration baseline. Divergence = stress.</p>
         </Section>
         <VoiceChart data={report.voiceData} />
@@ -529,7 +530,7 @@ export default function Report() {
         <div className="max-w-5xl mx-auto px-8">
           <Section>
             <PhaseLabel text="03  CONFIDENCE vs ACCURACY" />
-            <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: '-0.02em' }}>When You Were Wrong and Sure</h2>
+            <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: 0 }}>When You Were Wrong and Sure</h2>
             <p className="text-body-lg text-t2 mt-3">Confident wrongness signals poor self-awareness. The most expensive mistake in an interview.</p>
           </Section>
           <div className="mt-10"><ConfidenceAccuracyChart questions={report.questions} /></div>
@@ -541,7 +542,7 @@ export default function Report() {
       <div className="py-24 max-w-5xl mx-auto px-8 border-b" style={{ borderColor: '#1e1e1e' }}>
         <Section>
           <PhaseLabel text="04  QUESTION BY QUESTION" />
-          <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: '-0.02em' }}>The Full Breakdown</h2>
+          <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: 0 }}>The Full Breakdown</h2>
           <p className="text-body-lg text-t2 mt-3 mb-10">Every question. Scored across 4 dimensions. Every answer with what was expected.</p>
         </Section>
         <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.05 }} className="flex flex-col gap-4">
@@ -556,7 +557,7 @@ export default function Report() {
         <div className="max-w-5xl mx-auto px-8">
           <Section>
             <PhaseLabel text="05  SHADOW QUESTIONS" />
-            <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Questions the AI Wanted to Ask</h2>
+            <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: 0 }}>Questions the AI Wanted to Ask</h2>
             <p className="text-body-lg text-t2 mt-3 mb-10">Three questions that never made it in. Study these before your real interview.</p>
           </Section>
           <ShadowQuestions questions={report.shadowQuestions} />
@@ -567,7 +568,7 @@ export default function Report() {
       <div className="py-24 max-w-5xl mx-auto px-8 border-b" style={{ borderColor: '#1e1e1e' }}>
         <Section>
           <PhaseLabel text="06  IMPROVEMENT PLAN" />
-          <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Fix These Before Your Real Interview</h2>
+          <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: 0 }}>Fix These Before Your Real Interview</h2>
           <p className="text-body-lg text-t2 mt-3 mb-10">Three specific things. With timelines.</p>
         </Section>
         <ImprovementPlan items={report.improvementPlan} />
@@ -578,7 +579,7 @@ export default function Report() {
         <div className="max-w-3xl mx-auto px-8 text-center">
           <p className="text-label font-mono text-t3 mb-10 uppercase tracking-widest">The Line</p>
           <Section>
-            <blockquote className="font-serif italic text-t1" style={{ fontSize: 'clamp(1.5rem, 3.5vw, 2.25rem)', lineHeight: 1.4, fontWeight: 700 }}>
+            <blockquote className="font-serif italic text-t1" style={{ fontSize: '2rem', lineHeight: 1.4, fontWeight: 700 }}>
               "{report.verdictQuote}"
             </blockquote>
             <p className="text-label font-mono text-t3 mt-6">— AI Interviewer · {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
@@ -591,7 +592,7 @@ export default function Report() {
         <div className="max-w-5xl mx-auto px-8">
           <Section>
             <PhaseLabel text="07  DELIVERABLES" />
-            <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Take It With You</h2>
+            <h2 className="font-serif text-t1 mt-2" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: 0 }}>Take It With You</h2>
             <p className="text-body-lg text-t2 mt-3 mb-10">Download your full report and session recording.</p>
           </Section>
           <div className="grid grid-cols-2 gap-4">

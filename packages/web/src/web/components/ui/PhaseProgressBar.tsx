@@ -15,7 +15,7 @@ const phases = [
 
 export function PhaseProgressBar({ currentPhase }: PhaseProgressBarProps) {
   return (
-    <div className="bg-bg2 border-b border-border px-8 py-4">
+    <div className="bg-bg0/95 border-b border-border-sub px-8 py-4 backdrop-blur-xl">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center">
           {phases.map((phase, idx) => {
@@ -30,16 +30,16 @@ export function PhaseProgressBar({ currentPhase }: PhaseProgressBarProps) {
                   <motion.div
                     className={`w-2.5 h-2.5 rounded-full flex items-center justify-center transition-all duration-300 ${
                       isDone
-                        ? 'bg-accent'
+                        ? 'bg-accent text-bg0'
                         : isActive
-                        ? 'bg-accent ring-4 ring-[rgba(99,102,241,0.20)] scale-110'
+                        ? 'bg-accent ring-4 ring-[rgba(198,244,50,0.18)] scale-110'
                         : 'border border-border bg-bg1'
                     }`}
                     initial={isDone ? { scale: 0 } : { scale: 1 }}
                     animate={{ scale: isActive ? 1.1 : 1 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                   >
-                    {isDone && <Check size={6} className="text-white" strokeWidth={3} />}
+                    {isDone && <Check size={6} className="text-bg0" strokeWidth={3} />}
                   </motion.div>
                   <span className="text-label font-mono text-t3 mt-1.5 whitespace-nowrap">{phase.label}</span>
                 </div>

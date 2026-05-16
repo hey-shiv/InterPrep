@@ -40,6 +40,36 @@ function tryParse(v: any) {
   return v;
 }
 
+type InterviewQuestion = {
+  id: string;
+  text: string;
+  type: string;
+};
+
+type AnswerScore = {
+  accuracy: number;
+  clarity: number;
+  confidence: number;
+  depth: number;
+  overall: number;
+  note: string;
+  idealAnswer?: string;
+};
+
+type ScoredQuestion = {
+  id: string;
+  question: string;
+  type: string;
+  answer: string;
+  idealAnswer: string;
+  accuracy: number;
+  clarity: number;
+  confidence: number;
+  depth: number;
+  score: number;
+  note: string;
+};
+
 export const ai = new Hono()
   // Generate questions for interview
   .post("/questions", async (c) => {
@@ -96,10 +126,10 @@ Make questions progressively harder. Include: 2 warmup/behavioral, 3 technical/c
       if (!sessionId) return c.json({ error: "No session ID" }, 400);
 
       // Build scored questions
-      const scoredQuestions = [];
-      for (const q of (questions || [])) {
+      const scoredQuestions: ScoredQuestion[] = [];
+      for (const q of ((questions || []) as InterviewQuestion[])) {
         const answer = answers?.[q.id] || "";
-        let score = { accuracy: 5, clarity: 5, confidence: 5, depth: 5, overall: 5, note: "" };
+        let score: AnswerScore = { accuracy: 5, clarity: 5, confidence: 5, depth: 5, overall: 5, note: "" };
         
         try {
           const scoreText = await chat(
@@ -118,7 +148,7 @@ Score this answer out of 10 each:
   "idealAnswer": "2-3 sentences on what the ideal answer covers"
 }`
           );
-          score = JSON.parse(cleanJson(scoreText));
+          score = { ...score, ...JSON.parse(cleanJson(scoreText)) };
         } catch {}
 
         scoredQuestions.push({
@@ -126,13 +156,13 @@ Score this answer out of 10 each:
           question: q.text,
           type: q.type,
           answer,
-          idealAnswer: (score as any).idealAnswer || "",
-          accuracy: (score as any).accuracy || 5,
-          clarity: (score as any).clarity || 5,
-          confidence: (score as any).confidence || 5,
-          depth: (score as any).depth || 5,
-          score: (score as any).overall || 5,
-          note: (score as any).note || "",
+          idealAnswer: score.idealAnswer || "",
+          accuracy: score.accuracy || 5,
+          clarity: score.clarity || 5,
+          confidence: score.confidence || 5,
+          depth: score.depth || 5,
+          score: score.overall || 5,
+          note: score.note || "",
         });
       }
 

@@ -20,18 +20,18 @@ export function DifferentiatorBox({ label = 'THE THING NOBODY ELSE DOES', text, 
         hidden: { opacity: 0, x: -8 },
         visible: { opacity: 1, x: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } }
       }}
-      className={`relative rounded-[10px] border border-border overflow-hidden ${
+      className={`relative rounded-[8px] border border-border overflow-hidden ${
         size === 'lg' ? 'p-8 border-2' : 'p-5'
       }`}
       style={{
-        background: 'linear-gradient(to right, rgba(99,102,241,0.06), transparent)',
+        background: 'linear-gradient(to right, rgba(198,244,50,0.06), transparent)',
       }}
     >
       {/* Left accent border */}
       <div
         className="absolute left-0 top-0 bottom-0 w-[2px]"
         style={{
-          background: 'linear-gradient(to bottom, #6366F1, rgba(99,102,241,0.4), transparent)',
+          background: 'linear-gradient(to bottom, #c6f432, rgba(198,244,50,0.35), transparent)',
         }}
       />
 
@@ -46,7 +46,7 @@ export function DifferentiatorBox({ label = 'THE THING NOBODY ELSE DOES', text, 
       {bullets && bullets.length > 0 && (
         <div className="flex flex-col gap-2 mt-4 pl-1">
           {bullets.map((b, i) => (
-            <p key={i} className="text-body-sm text-t2">✦ {b}</p>
+            <p key={i} className="text-body-sm text-t2">- {b}</p>
           ))}
         </div>
       )}

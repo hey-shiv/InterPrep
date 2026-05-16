@@ -22,7 +22,7 @@ export function PhaseLabel({ phase, text, showLine = true }: PhaseLabelProps) {
       </p>
       {showLine && (
         <div className="flex-1 h-px ml-3" style={{
-          background: 'linear-gradient(to right, #2A2A3A, transparent)'
+          background: 'linear-gradient(to right, #2b343d, transparent)'
         }} />
       )}
     </div>

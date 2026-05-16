@@ -125,7 +125,7 @@ export default function Setup() {
         {/* Header */}
         <div className="py-12">
           <PhaseLabel phase="entry" text="PHASE 1 — ENTRY" />
-          <h1 className="font-serif text-t1 mt-3" style={{ fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
+          <h1 className="font-serif text-t1 mt-3" style={{ fontSize: '2.5rem', fontWeight: 800, letterSpacing: 0 }}>
             Set the Stage
           </h1>
           <p className="text-body-lg text-t2 mt-3" style={{ lineHeight: 1.7 }}>

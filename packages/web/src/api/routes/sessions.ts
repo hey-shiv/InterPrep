@@ -60,9 +60,14 @@ export const sessions = new Hono()
       const buffer = await file.arrayBuffer();
       let resumeText = "";
       try {
-        const pdfParse = (await import("pdf-parse")).default;
-        const pdfData = await pdfParse(Buffer.from(buffer));
-        resumeText = pdfData.text;
+        const { PDFParse } = await import("pdf-parse");
+        const parser = new PDFParse({ data: new Uint8Array(buffer) });
+        try {
+          const pdfData = await parser.getText();
+          resumeText = pdfData.text;
+        } finally {
+          await parser.destroy();
+        }
       } catch {
         resumeText = "Resume text extraction failed. Proceeding with basic analysis.";
       }
