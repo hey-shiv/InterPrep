@@ -32,7 +32,7 @@ export function EditionBadge() {
   return (
     <span className="edition-badge">
       <InterPrepMark />
-      Winter ’26
+      Winter '26
     </span>
   )
 }

@@ -125,7 +125,7 @@ export default function Calibration() {
           <div className="panel p-5">
             <p className="eyebrow">Prompt</p>
             <p className="mt-3 text-2xl font-bold leading-snug text-t1">
-              “My name is [name]. I’m interviewing for this role because I want to build reliable products with a strong team.”
+              "My name is [name]. I'm interviewing for this role because I want to build reliable products with a strong team."
             </p>
             <div className="bar mt-5"><span style={{ width: `${progress}%` }} /></div>
           </div>

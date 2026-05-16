@@ -144,7 +144,7 @@ export default function Report() {
             <h1 className="page-title mt-6">{style.label}</h1>
             <p className="body-lg mt-3">{report.debrief}</p>
             <blockquote className="mt-6 rounded-[8px] border border-border-sub bg-bg1 p-5 text-xl font-semibold text-t1">
-              “{report.verdictQuote}”
+              "{report.verdictQuote}"
             </blockquote>
           </div>
 

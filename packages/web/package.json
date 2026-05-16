@@ -1,6 +1,7 @@
 {
   "name": "@template/web",
   "private": true,
+  "packageManager": "bun@1.3.5",
   "type": "module",
   "exports": {
     ".": "./src/api/index.ts"

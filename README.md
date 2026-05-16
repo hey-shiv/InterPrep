@@ -1,6 +1,6 @@
-# sandbox-app-template
+# InterPrep
 
-Monorepo: Bun workspaces + Turborepo.
+AI interview practice app built with Bun workspaces, Turborepo, Vite, React, Hono, and Turso/LibSQL.
 
 ## Project Structure
 
@@ -53,6 +53,31 @@ The desktop app has no separate renderer by default. It loads the web app from `
 ## Servers
 
 Dev servers are started and managed automatically — no need to run them manually.
+
+## Vercel Deployment
+
+Create the Vercel project from this repository and use these settings:
+
+```txt
+Root Directory: packages/web
+Framework Preset: Vite
+Install Command: bun install
+Build Command: bun run build
+Output Directory: dist
+```
+
+The web package includes `api/index.ts` for the Hono serverless function and `vercel.json` for `/api/*` plus SPA rewrites.
+
+Required Vercel environment variables:
+
+```txt
+DATABASE_URL
+DATABASE_AUTH_TOKEN
+GROQ_API_KEY
+WEBSITE_URL
+```
+
+Use the production Vercel URL for `WEBSITE_URL` after the first deploy.
 
 ## Database
 
