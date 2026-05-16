@@ -3,6 +3,7 @@ import { db } from "../database";
 import * as schema from "../database/schema";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { PDFParse } from "pdf-parse";
 
 export const sessions = new Hono()
   // GET all sessions
@@ -60,7 +61,6 @@ export const sessions = new Hono()
       const buffer = await file.arrayBuffer();
       let resumeText = "";
       try {
-        const { PDFParse } = await import("pdf-parse");
         const parser = new PDFParse({ data: new Uint8Array(buffer) });
         try {
           const pdfData = await parser.getText();
