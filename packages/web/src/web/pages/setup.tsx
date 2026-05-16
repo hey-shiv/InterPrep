@@ -114,16 +114,19 @@ export default function Setup() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      if (!res.ok) throw new Error('Session creation failed')
       const data = await res.json()
       const sessionId = data.session?.id
-      if (sessionId) {
-        sessionStorage.setItem('sessionId', sessionId)
-        sessionStorage.setItem('sessionData', JSON.stringify({ ...body, id: sessionId }))
-        sessionStorage.removeItem('reportData')
-      }
-    } catch {}
-    streamRef.current?.getTracks().forEach(track => track.stop())
-    setLocation('/calibration')
+      if (!sessionId) throw new Error('No session ID returned')
+      sessionStorage.setItem('sessionId', sessionId)
+      sessionStorage.setItem('sessionData', JSON.stringify({ ...body, id: sessionId }))
+      sessionStorage.removeItem('reportData')
+      streamRef.current?.getTracks().forEach(track => track.stop())
+      setLocation('/calibration')
+    } catch (e: any) {
+      setParseError('Failed to start session. Please check your connection and try again.')
+      setSubmitting(false)
+    }
   }
 
   const selected = ROLES.find(role => role.id === selectedRole) || ROLES[0]
