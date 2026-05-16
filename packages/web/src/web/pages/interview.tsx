@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { motion, AnimatePresence, useSpring } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useLocation } from 'wouter'
 import { Mic, MicOff, AlertTriangle } from 'lucide-react'
 import { GlowButton } from '../components/ui/GlowButton'
@@ -13,13 +13,10 @@ type Emotion = 'neutral' | 'confident' | 'nervous' | 'engaged' | 'confused'
 type InterviewState = 'loading' | 'question' | 'silence' | 'listening' | 'processing' | 'done'
 
 interface Question {
-  id: string
-  text: string
-  type: string
-  difficulty?: string
+  id: string; text: string; type: string; difficulty?: string
 }
 
-const TOTAL_TIME = 10 * 60 // 10 minutes
+const TOTAL_TIME = 10 * 60
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60)
@@ -39,13 +36,11 @@ export default function Interview() {
   const [wpm, setWpm] = useState(0)
   const [pitch, setPitch] = useState(0)
   const [fillers, setFillers] = useState(0)
-  const [transcript, setTranscript] = useState('')
   const [currentAnswer, setCurrentAnswer] = useState('')
-  const [wordTimings, setWordTimings] = useState<number[]>([])
   const [displayedWords, setDisplayedWords] = useState(0)
   const [sttAvailable, setSttAvailable] = useState(true)
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const [cameraStream, setCameraStream] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -54,13 +49,26 @@ export default function Interview() {
   const recognitionRef = useRef<any>(null)
   const questionWordsRef = useRef<string[]>([])
 
-  // Load questions on mount
+  // Load questions + camera on mount
   useEffect(() => {
     const sid = sessionStorage.getItem('sessionId')
     const sdata = sessionStorage.getItem('sessionData')
     if (!sid) { setLocation('/setup'); return }
     setSessionId(sid)
 
+    // Start camera FIRST — give it time to warm up
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then(stream => {
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.play().catch(() => {})
+        }
+        setCameraStream(true)
+      })
+      .catch(() => { setCameraStream(false) })
+
+    // Load questions async
     async function loadQuestions() {
       try {
         const parsed = sdata ? JSON.parse(sdata) : {}
@@ -71,25 +79,14 @@ export default function Interview() {
         })
         const data = await res.json()
         setQuestions(data.questions || getDefaultQuestions())
-        setState('question')
-        startTimer()
       } catch {
         setQuestions(getDefaultQuestions())
-        setState('question')
-        startTimer()
       }
+      setState('question')
+      startTimer()
     }
     loadQuestions()
 
-    // Camera
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      .then(stream => {
-        streamRef.current = stream
-        if (videoRef.current) videoRef.current.srcObject = stream
-      })
-      .catch(() => {})
-
-    // STT check
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       setSttAvailable(false)
     }
@@ -102,7 +99,7 @@ export default function Interview() {
     }
   }, [])
 
-  // Simulate live metrics
+  // Live metrics while listening
   useEffect(() => {
     if (state !== 'listening') return
     const interval = setInterval(() => {
@@ -113,7 +110,7 @@ export default function Interview() {
     return () => clearInterval(interval)
   }, [state])
 
-  // Reveal question words
+  // Word reveal per question
   useEffect(() => {
     if (state !== 'question' || questions.length === 0) return
     const q = questions[currentQ]
@@ -127,7 +124,6 @@ export default function Interview() {
       setDisplayedWords(i)
       if (i >= words.length) {
         clearInterval(interval)
-        // Start silence countdown after words revealed
         setTimeout(() => startSilenceWindow(), 300)
       }
     }, 80)
@@ -137,11 +133,7 @@ export default function Interview() {
   function startTimer() {
     timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current!)
-          endInterview()
-          return 0
-        }
+        if (prev <= 1) { clearInterval(timerRef.current!); endInterview(); return 0 }
         return prev - 1
       })
     }, 1000)
@@ -154,10 +146,7 @@ export default function Interview() {
     silenceTimerRef.current = setInterval(() => {
       t--
       setSilenceCountdown(t)
-      if (t <= 0) {
-        clearInterval(silenceTimerRef.current!)
-        startListening()
-      }
+      if (t <= 0) { clearInterval(silenceTimerRef.current!); startListening() }
     }, 1000)
   }
 
@@ -165,7 +154,6 @@ export default function Interview() {
     setState('listening')
     setCurrentAnswer('')
     setFillers(0)
-
     if (!sttAvailable) return
 
     const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
@@ -186,8 +174,7 @@ export default function Interview() {
       }
       setCurrentAnswer(full.trim())
       setFillers(fillerCount)
-      const wordCount = full.trim().split(/\s+/).length
-      setWpm(Math.round(wordCount * 6))
+      setWpm(Math.round(full.trim().split(/\s+/).length * 6))
     }
     recognition.start()
   }
@@ -195,12 +182,8 @@ export default function Interview() {
   const stopAnswering = useCallback(() => {
     recognitionRef.current?.stop()
     setState('processing')
-
     const q = questions[currentQ]
-    if (q) {
-      setAnswers(prev => ({ ...prev, [q.id]: currentAnswer }))
-    }
-
+    if (q) setAnswers(prev => ({ ...prev, [q.id]: currentAnswer }))
     setTimeout(() => {
       if (currentQ < questions.length - 1) {
         setCurrentQ(prev => prev + 1)
@@ -217,15 +200,20 @@ export default function Interview() {
     streamRef.current?.getTracks().forEach(t => t.stop())
     setState('done')
 
-    if (!sessionId) { setLocation('/report'); return }
+    if (!sessionId) { setTimeout(() => setLocation('/report'), 1500); return }
 
     try {
       const payload = { answers, questions, sessionId }
-      await fetch('/api/ai/analyze', {
+      const res = await fetch('/api/ai/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
+      if (res.ok) {
+        const data = await res.json()
+        // Cache the full analyze result so report page reads it instantly
+        if (data.reportData) sessionStorage.setItem('reportData', JSON.stringify(data.reportData))
+      }
     } catch {}
 
     setLocation('/report')
@@ -233,8 +221,7 @@ export default function Interview() {
 
   const q = questions[currentQ]
   const qWords = q?.text.split(' ') || []
-  const progress = questions.length > 0 ? ((currentQ) / questions.length) : 0
-
+  const progress = questions.length > 0 ? (currentQ / questions.length) : 0
   const timerColor = timeLeft < 60 ? 'text-danger' : timeLeft < 180 ? 'text-warning' : 'text-t1'
 
   if (state === 'loading') {
@@ -243,7 +230,7 @@ export default function Interview() {
         <div className="text-center">
           <div className="flex gap-1.5 justify-center mb-4">
             {[0, 1, 2].map(i => (
-              <motion.div key={i} className="w-2 h-2 rounded-full bg-accent"
+              <motion.div key={i} className="w-2 h-2 bg-accent"
                 animate={{ scale: [1, 1.5, 1] }}
                 transition={{ duration: 0.6, delay: i * 0.15, repeat: Infinity }} />
             ))}
@@ -259,7 +246,8 @@ export default function Interview() {
       <div className="min-h-screen bg-bg0 flex items-center justify-center">
         <div className="text-center">
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            className="w-20 h-20 rounded-full bg-success/20 border-2 border-success flex items-center justify-center mx-auto mb-6">
+            className="w-20 h-20 bg-success/20 border-2 border-success flex items-center justify-center mx-auto mb-6"
+            style={{ borderRadius: 2 }}>
             <span className="text-display-md font-bold text-success">✓</span>
           </motion.div>
           <p className="text-h1 text-t1 font-bold mb-2">Interview Complete</p>
@@ -271,19 +259,14 @@ export default function Interview() {
 
   return (
     <div className="h-screen bg-bg0 flex flex-col overflow-hidden">
-      {/* Top Bar */}
+      {/* Top bar */}
       <div className="h-12 bg-bg0 border-b border-border-sub flex items-center justify-between px-8 flex-shrink-0">
         <div className="flex items-center gap-4">
           <span className="font-mono text-mono-sm text-t3">Q{currentQ + 1} / {questions.length || 8}</span>
-          <div className="w-24 h-1 bg-border rounded-chip overflow-hidden">
-            <motion.div
-              className="h-full bg-accent rounded-chip"
-              animate={{ width: `${progress * 100}%` }}
-              transition={{ duration: 0.4, ease: 'easeOut' }}
-            />
+          <div className="w-24 h-0.5 bg-border overflow-hidden">
+            <motion.div className="h-full bg-accent" animate={{ width: `${progress * 100}%` }} transition={{ duration: 0.4 }} />
           </div>
         </div>
-
         <div className="flex items-center gap-2">
           <span className="relative flex h-1.5 w-1.5">
             <span className="animate-ping-slow absolute inline-flex h-full w-full rounded-full bg-danger opacity-75" />
@@ -291,7 +274,6 @@ export default function Interview() {
           </span>
           <span className="text-label font-mono text-danger">PHASE 2 · LIVE</span>
         </div>
-
         <div className="flex items-center gap-6">
           <motion.span
             className={`font-mono text-h2 ${timerColor}`}
@@ -306,46 +288,64 @@ export default function Interview() {
         </div>
       </div>
 
-      {/* Camera Zone */}
-      <div className="relative overflow-hidden flex-shrink-0" style={{ height: '48vh' }}>
-        <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0" style={{ backgroundColor: 'rgba(7,7,12,0.3)' }} />
+      {/* Camera zone */}
+      <div className="relative overflow-hidden flex-shrink-0 bg-bg3" style={{ height: '48vh' }}>
+        {/* Video fills absolutely — explicit width/height forces correct rendering */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            position: 'absolute', inset: 0,
+            width: '100%', height: '100%',
+            objectFit: 'cover',
+            display: 'block',
+            background: '#000',
+          }}
+        />
 
-        {/* TL — Emotion Orb */}
-        <div className="absolute top-4 left-4">
+        {/* Camera off placeholder */}
+        {!cameraStream && (
+          <div className="absolute inset-0 flex items-center justify-center bg-bg3">
+            <div className="text-center">
+              <MicOff size={32} className="text-t3 mx-auto mb-2" />
+              <p className="text-body-sm text-t3 font-mono">Camera unavailable</p>
+            </div>
+          </div>
+        )}
+
+        {/* Dark overlay — transparent to not block camera */}
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.4) 100%)' }} />
+
+        {/* TL — Emotion */}
+        <div className="absolute top-4 left-4 pointer-events-none">
           <EmotionOrb emotion={emotion} />
         </div>
 
-        {/* TR — Live Metrics */}
-        <div className="absolute top-4 right-4 flex flex-col gap-2">
+        {/* TR — Live metrics */}
+        <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-none">
           <LiveMetricBadge icon={<Mic size={14} />} value={wpm > 0 ? `${wpm} WPM` : '— WPM'} />
           <LiveMetricBadge icon={<span style={{ fontSize: 12 }}>Hz</span>} value={pitch > 0 ? `±${Math.abs(pitch - 142)}Hz` : '—'} />
           <LiveMetricBadge icon={<AlertTriangle size={14} />} value={`${fillers} fillers`} danger={fillers > 5} />
         </div>
 
         {/* Left pitch bar */}
-        <div
-          className="absolute left-0 top-0 bottom-0 w-1.5"
-          style={{
-            background: pitch > 160
-              ? 'linear-gradient(to bottom, #EF4444, transparent)'
-              : pitch > 140
-              ? 'linear-gradient(to bottom, #6366F1, transparent)'
-              : 'linear-gradient(to bottom, #0EA5E9, transparent)',
-          }}
-        />
+        <div className="absolute left-0 top-0 bottom-0 w-1" style={{
+          background: pitch > 160 ? 'linear-gradient(to bottom, #EF4444, transparent)' : pitch > 140 ? 'linear-gradient(to bottom, #5c4fff, transparent)' : 'linear-gradient(to bottom, #0EA5E9, transparent)',
+        }} />
 
-        {/* Bottom transcript bar */}
+        {/* Transcript bar */}
         <div
           className="absolute bottom-0 left-0 right-0 h-12 flex items-center px-4 gap-3 border-t border-border-sub/50"
-          style={{ backgroundColor: 'rgba(7,7,12,0.85)', backdropFilter: 'blur(8px)' }}
+          style={{ backgroundColor: 'rgba(10,10,10,0.88)', backdropFilter: 'blur(8px)' }}
         >
           <span className="text-label font-mono text-t4 mr-3 flex-shrink-0">TRANSCRIPT</span>
           <span className="font-mono text-mono-sm text-t2 truncate flex-1">
             {currentAnswer || (state === 'listening' ? 'Listening...' : '')}
           </span>
           {fillers > 0 && (
-            <span className="flex-shrink-0 font-mono text-mono-sm text-warning border border-warning/30 rounded-chip px-2 py-0.5">
+            <span className="flex-shrink-0 font-mono text-mono-sm text-warning border border-warning/30 px-2 py-0.5" style={{ borderRadius: 2 }}>
               {fillers} fillers
             </span>
           )}
@@ -356,10 +356,8 @@ export default function Interview() {
           {state === 'silence' && (
             <motion.div
               className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              style={{ backgroundColor: 'rgba(239,68,68,0.08)' }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              style={{ backgroundColor: 'rgba(239,68,68,0.06)' }}
             >
               <motion.p
                 className="text-label font-mono text-danger tracking-widest"
@@ -374,29 +372,20 @@ export default function Interview() {
         </AnimatePresence>
       </div>
 
-      {/* Question Zone */}
+      {/* Question zone */}
       <div className="flex-1 overflow-y-auto bg-bg1">
         <div className="max-w-3xl mx-auto px-8 py-6 w-full">
           {q && (
             <>
-              {/* Question header */}
               <div className="flex justify-between items-center mb-5">
-                <span className="font-mono text-mono-sm bg-bg3 border border-border rounded-chip px-3 py-1 text-t2">
-                  Q{currentQ + 1}
-                </span>
+                <span className="font-mono text-mono-sm bg-bg3 border border-border px-3 py-1 text-t2" style={{ borderRadius: 2 }}>Q{currentQ + 1}</span>
                 <SectionBadge variant="time" label={q.type || 'Technical'} />
               </div>
 
-              {/* Question text — word reveal */}
+              {/* Question — word reveal */}
               <div className="text-h1 text-t1 leading-[1.4] mb-4 flex flex-wrap gap-x-2">
                 {qWords.map((word, i) => (
-                  <motion.span
-                    key={`${currentQ}-${i}`}
-                    custom={i}
-                    variants={wordReveal}
-                    initial="hidden"
-                    animate={i < displayedWords ? 'visible' : 'hidden'}
-                  >
+                  <motion.span key={`${currentQ}-${i}`} custom={i} variants={wordReveal} initial="hidden" animate={i < displayedWords ? 'visible' : 'hidden'}>
                     {word}
                   </motion.span>
                 ))}
@@ -405,19 +394,9 @@ export default function Interview() {
               {/* Silence countdown bar */}
               <AnimatePresence>
                 {state === 'silence' && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="mb-4"
-                  >
-                    <div className="h-1 bg-border rounded-chip overflow-hidden mb-1">
-                      <motion.div
-                        className="h-full bg-danger rounded-chip"
-                        initial={{ width: '100%' }}
-                        animate={{ width: '0%' }}
-                        transition={{ duration: 4, ease: 'linear' }}
-                      />
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mb-4">
+                    <div className="h-0.5 bg-border overflow-hidden mb-1">
+                      <motion.div className="h-full bg-danger" initial={{ width: '100%' }} animate={{ width: '0%' }} transition={{ duration: 4, ease: 'linear' }} />
                     </div>
                     <p className="text-label font-mono text-t4">COMPOSURE WINDOW</p>
                   </motion.div>
@@ -435,18 +414,15 @@ export default function Interview() {
                       <span className="text-body-sm text-t3">Listening...</span>
                     </div>
                     {currentAnswer && (
-                      <div className="bg-bg2 rounded-card p-4 border border-border-sub text-body text-t1 min-h-16">
+                      <div className="bg-bg2 p-4 border border-border-sub text-body text-t1 min-h-16" style={{ borderRadius: 2 }}>
                         {currentAnswer.split(' ').map((word, i) => {
-                          const isFillerWord = ['um', 'uh', 'like', 'you know', 'basically', 'literally'].includes(word.toLowerCase())
+                          const isFiller = ['um', 'uh', 'like', 'you know', 'basically', 'literally'].includes(word.toLowerCase())
                           return (
                             <span key={i}>
-                              {isFillerWord ? (
-                                <span className="rounded px-1 mx-0.5" style={{ backgroundColor: 'rgba(245,158,11,0.20)', color: '#F59E0B' }}>
-                                  {word}
-                                </span>
-                              ) : (
-                                <span>{word} </span>
-                              )}
+                              {isFiller
+                                ? <span className="px-1 mx-0.5" style={{ backgroundColor: 'rgba(245,158,11,0.20)', color: '#F59E0B' }}>{word}</span>
+                                : <span>{word} </span>
+                              }
                             </span>
                           )
                         })}
@@ -455,10 +431,10 @@ export default function Interview() {
                   </div>
                 )}
 
-                {(state === 'listening' && !sttAvailable) && (
+                {state === 'listening' && !sttAvailable && (
                   <textarea
-                    className="w-full h-32 resize-none text-body text-t1 rounded-card p-4 border border-border focus:border-accent outline-none transition-colors"
-                    style={{ backgroundColor: '#111118' }}
+                    className="w-full h-32 resize-none text-body text-t1 p-4 border border-border focus:border-accent outline-none transition-colors"
+                    style={{ backgroundColor: '#141414', borderRadius: 2 }}
                     placeholder="Type your answer here..."
                     value={currentAnswer}
                     onChange={e => setCurrentAnswer(e.target.value)}
@@ -469,7 +445,7 @@ export default function Interview() {
                   <div className="h-16 flex items-center">
                     <div className="flex gap-1.5">
                       {[0, 1, 2].map(i => (
-                        <motion.div key={i} className="w-1.5 h-1.5 rounded-full bg-accent"
+                        <motion.div key={i} className="w-1.5 h-1.5 bg-accent"
                           animate={{ scale: [1, 1.5, 1] }}
                           transition={{ duration: 0.6, delay: i * 0.15, repeat: Infinity }} />
                       ))}
@@ -494,12 +470,9 @@ export default function Interview() {
                 ))}
               </div>
 
-              {/* Actions */}
               <div className="flex justify-end gap-3">
                 {state === 'listening' && (
-                  <GlowButton variant="secondary" onClick={stopAnswering}>
-                    I'm Done Speaking
-                  </GlowButton>
+                  <GlowButton variant="secondary" onClick={stopAnswering}>I'm Done Speaking</GlowButton>
                 )}
                 {(state === 'question' || state === 'silence') && currentQ < (questions.length - 1) && (
                   <GlowButton variant="ghost" size="sm" onClick={() => {
