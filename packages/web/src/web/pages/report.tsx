@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
 import { ArrowLeft, ArrowRight, BarChart3, CheckCircle2, Download, RefreshCcw, Target, TrendingUp } from 'lucide-react'
 import { Brand, StageNav } from '../components/brand'
@@ -59,7 +59,9 @@ export default function Report() {
             setReport(normalizeReport(JSON.parse(cached)))
             setLoading(false)
             return
-          } catch {}
+          } catch {
+            // Ignore invalid cached reports and try the API/session fallback below.
+          }
         }
       }
 

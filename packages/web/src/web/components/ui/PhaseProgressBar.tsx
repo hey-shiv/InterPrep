@@ -21,7 +21,6 @@ export function PhaseProgressBar({ currentPhase }: PhaseProgressBarProps) {
           {phases.map((phase, idx) => {
             const isDone = phase.num < currentPhase
             const isActive = phase.num === currentPhase
-            const isFuture = phase.num > currentPhase
 
             return (
               <div key={phase.num} className="flex items-center flex-1 last:flex-none">

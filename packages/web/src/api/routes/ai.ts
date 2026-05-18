@@ -33,13 +33,6 @@ function cleanJson(text: string): string {
   return text.replaceAll("```json", "").replaceAll("```", "").trim();
 }
 
-function tryParse(v: any) {
-  if (typeof v === "string") {
-    try { return JSON.parse(v); } catch { return v; }
-  }
-  return v;
-}
-
 type InterviewQuestion = {
   id: string;
   text: string;
@@ -74,7 +67,7 @@ export const ai = new Hono()
   // Generate questions for interview
   .post("/questions", async (c) => {
     try {
-      const { role, resumeData, sessionId } = await c.req.json();
+      const { role, resumeData } = await c.req.json();
       
       const resumeSummary = resumeData 
         ? `Candidate strengths: ${resumeData.strengths?.join(", ")}. Areas to probe: ${resumeData.areasToExplore?.join(", ")}. Landmines: ${resumeData.landmines?.join(", ")}.`
@@ -101,7 +94,7 @@ Make questions progressively harder. Include: 2 warmup/behavioral, 3 technical/c
       );
       const parsed = JSON.parse(cleanJson(text));
       return c.json({ questions: parsed.questions || [] }, 200);
-    } catch (e: any) {
+    } catch (_e: any) {
       // Return default questions on error
       return c.json({
         questions: [
@@ -149,7 +142,9 @@ Score this answer out of 10 each:
 }`
           );
           score = { ...score, ...JSON.parse(cleanJson(scoreText)) };
-        } catch {}
+        } catch {
+          // Keep default scoring when the model response is unavailable or invalid.
+        }
 
         scoredQuestions.push({
           id: q.id,
@@ -202,7 +197,9 @@ Return JSON:
         verdictQuote = debriefData.verdictQuote || verdictQuote;
         shadowQuestions = debriefData.shadowQuestions || [];
         improvementPlan = debriefData.improvementPlan || [];
-      } catch {}
+      } catch {
+        // The basic score still works without a generated debrief.
+      }
 
       // Save to DB
       const metricsObj = {
@@ -223,7 +220,9 @@ Return JSON:
           status: "complete",
           completedAt: new Date(),
         }).where(eq(schema.sessions.id, sessionId));
-      } catch {}
+      } catch {
+        // Session persistence is best-effort so report generation can still complete.
+      }
 
       return c.json({
         verdict,
@@ -257,7 +256,7 @@ Return JSON:
   // Generate questions (legacy)
   .post("/generate-questions", async (c) => {
     try {
-      const { roleId, resumeAnalysis } = await c.req.json();
+      const { roleId } = await c.req.json();
       const text = await chat(
         "You are a senior interviewer. Generate interview questions. Return JSON only.",
         `Generate 8 questions for ${roleId}. Return: { "questions": [...] }`
@@ -286,7 +285,7 @@ Return JSON:
   // Generate verdict
   .post("/generate-verdict", async (c) => {
     try {
-      const { roleId, resumeAnalysis, metrics } = await c.req.json();
+      const { metrics } = await c.req.json();
       const avg = metrics.length ? metrics.reduce((a: number, m: any) => a + (m.score?.overall ?? 5), 0) / metrics.length : 5;
       const verdict = avg >= 7.5 ? "HIRE" : avg >= 5.5 ? "BORDERLINE" : "NO_HIRE";
       return c.json({ data: { decision: verdict, overallScore: avg } }, 200);

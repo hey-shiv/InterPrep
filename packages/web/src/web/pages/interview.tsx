@@ -216,7 +216,9 @@ export default function Interview() {
             verdictQuote: data.verdictQuote || 'Your strongest answer was the one with the clearest structure.',
           }))
         }
-      } catch {}
+      } catch {
+        // If analysis fails, the report page falls back to the locally available session data.
+      }
     }
 
     setLocation('/report')

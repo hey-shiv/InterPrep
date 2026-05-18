@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { db } from "../database";
+import { db, ensureDatabaseReady } from "../database";
 import * as schema from "../database/schema";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -9,6 +9,7 @@ export const sessions = new Hono()
   // GET all sessions
   .get("/", async (c) => {
     try {
+      await ensureDatabaseReady();
       const all = await db.select().from(schema.sessions).orderBy(desc(schema.sessions.createdAt));
       // Parse JSON fields
       const parsed = all.map((s: any) => ({
@@ -23,17 +24,19 @@ export const sessions = new Hono()
       }));
       return c.json({ sessions: parsed }, 200);
     } catch (e: any) {
-      return c.json({ error: e.message }, 500);
+      return c.json({ sessions: [], warning: e.message }, 200);
     }
   })
 
   // POST create new session
   .post("/", async (c) => {
+    let body: any = {};
     try {
-      const body = await c.req.json();
+      body = await c.req.json();
       const id = randomUUID();
       const roleId = body.jobRole || body.roleId || "software-engineer";
       const roleTitle = body.jobRole || body.roleTitle || roleId;
+      await ensureDatabaseReady();
       const [session] = await db.insert(schema.sessions).values({
         id,
         roleId,
@@ -44,7 +47,20 @@ export const sessions = new Hono()
       }).returning();
       return c.json({ session: { ...session, id } }, 201);
     } catch (e: any) {
-      return c.json({ error: e.message }, 500);
+      const id = randomUUID();
+      const roleId = body.jobRole || body.roleId || "software-engineer";
+      return c.json({
+        session: {
+          id,
+          roleId,
+          roleTitle: body.jobRole || body.roleTitle || roleId,
+          candidateName: body.candidateName,
+          resumeAnalysis: body.resumeAnalysis || null,
+          status: "setup",
+          createdAt: new Date().toISOString(),
+        },
+        warning: e.message,
+      }, 201);
     }
   })
 
@@ -106,7 +122,7 @@ export const sessions = new Hono()
       const data = await res.json() as any;
       const parsed = JSON.parse(data.choices[0].message.content);
       return c.json(parsed, 200);
-    } catch (e: any) {
+    } catch (_e: any) {
       // Return mock data on any error
       return c.json({
         name: "Candidate",
@@ -123,6 +139,7 @@ export const sessions = new Hono()
   .get("/:id", async (c) => {
     try {
       const id = c.req.param("id");
+      await ensureDatabaseReady();
       const [session] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, id));
       if (!session) return c.json({ error: "Not found" }, 404);
       const s = session as any;
@@ -158,6 +175,7 @@ export const sessions = new Hono()
         }
       }
       if (body.status === "complete") update.completedAt = new Date();
+      await ensureDatabaseReady();
       const [session] = await db.update(schema.sessions).set(update).where(eq(schema.sessions.id, id)).returning();
       return c.json({ session }, 200);
     } catch (e: any) {

@@ -33,7 +33,10 @@ export default function Calibration() {
           }
         }
         assignStream()
-      } catch {}
+      } catch {
+        setCameraOk(false)
+        setMicOk(false)
+      }
     }
     startMedia()
     return () => {

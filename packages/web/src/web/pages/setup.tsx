@@ -123,7 +123,7 @@ export default function Setup() {
       sessionStorage.removeItem('reportData')
       streamRef.current?.getTracks().forEach(track => track.stop())
       setLocation('/calibration')
-    } catch (e: any) {
+    } catch (_e: any) {
       setParseError('Failed to start session. Please check your connection and try again.')
       setSubmitting(false)
     }
