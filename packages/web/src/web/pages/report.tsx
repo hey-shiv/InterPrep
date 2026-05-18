@@ -116,9 +116,18 @@ export default function Report() {
 
   const style = verdictStyle[report.verdict]
   const questions = report.questions.length ? report.questions : mockQuestions()
+  const verdictHeadline = style.label.includes(',')
+    ? {
+      lead: style.label.split(',')[0],
+      rest: style.label.split(',').slice(1).join(',').trim(),
+    }
+    : {
+      lead: style.label,
+      rest: 'Evidence board below',
+    }
 
   return (
-    <div className="app-page">
+    <div className="flow-page report">
       <header className="app-topbar">
         <div className="app-nav">
           <Brand />
@@ -135,27 +144,29 @@ export default function Report() {
       </header>
 
       <main>
-        <section id="summary" className="app-container grid items-start gap-6 py-8 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="panel p-7">
-            <p className="eyebrow">Final verdict</p>
-            <div className="mt-5 inline-flex rounded-[8px] border px-5 py-3" style={{ borderColor: style.color, background: style.bg }}>
-              <span className="text-5xl font-extrabold" style={{ color: style.color }}>{report.verdict}</span>
+        <section id="summary" className="report-hero">
+          <div className="panel verdict-card p-7">
+            <div>
+              <p className="eyebrow">Act IV - final verdict</p>
+              <div className="mt-6 inline-flex rounded-[8px] border px-5 py-3" style={{ borderColor: style.color, background: style.bg }}>
+                <span className="verdict-word" style={{ color: style.color }}>{report.verdict}</span>
+              </div>
+              <h1 className="flow-title mt-7">{verdictHeadline.lead}<span>{verdictHeadline.rest}</span></h1>
+              <p className="body-lg mt-4">{report.debrief}</p>
             </div>
-            <h1 className="page-title mt-6">{style.label}</h1>
-            <p className="body-lg mt-3">{report.debrief}</p>
             <blockquote className="mt-6 rounded-[8px] border border-border-sub bg-bg1 p-5 text-xl font-semibold text-t1">
               "{report.verdictQuote}"
             </blockquote>
           </div>
 
-          <div className="grid gap-4">
+          <div className="report-dashboard">
             <div className="grid gap-4 sm:grid-cols-4">
               <Metric label="Overall" value={`${report.score.toFixed(1)}/10`} tone="text-success" />
               <Metric label="Questions" value={String(report.metrics.totalQuestions || questions.length)} />
               <Metric label="Confidence" value={`${report.metrics.avgConfidence.toFixed(1)}`} tone="text-accent" />
               <Metric label="Stress" value={`${Math.round(report.metrics.peakStress * 100)}%`} tone="text-warning" />
             </div>
-            <div className="panel p-5">
+            <div className="panel p-5 scatter-stage">
               <div className="mb-5 flex items-center justify-between">
                 <div>
                   <p className="eyebrow">Confidence vs accuracy</p>
@@ -168,12 +179,10 @@ export default function Report() {
           </div>
         </section>
 
-        <section className="section">
-          <div className="app-container grid gap-4 md:grid-cols-3">
-            <Insight icon={Target} title="Best moment" value={report.metrics.bestMoment || 'Q1'} copy="Use this answer as your style reference." />
-            <Insight icon={TrendingUp} title="Primary fix" value="Structure" copy="Lead with the answer, then justify with tradeoffs." />
-            <Insight icon={CheckCircle2} title="Next session" value="Replay weak Qs" copy="Practice the bottom two answers out loud." />
-          </div>
+        <section className="insight-row">
+          <Insight icon={Target} title="Best moment" value={report.metrics.bestMoment || 'Q1'} copy="Use this answer as your style reference." />
+          <Insight icon={TrendingUp} title="Primary fix" value="Structure" copy="Lead with the answer, then justify with tradeoffs." />
+          <Insight icon={CheckCircle2} title="Next session" value="Replay weak Qs" copy="Practice the bottom two answers out loud." />
         </section>
 
         <section id="questions" className="section">

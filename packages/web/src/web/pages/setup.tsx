@@ -132,7 +132,7 @@ export default function Setup() {
   const selected = ROLES.find(role => role.id === selectedRole) || ROLES[0]
 
   return (
-    <div className="app-page">
+    <div className="flow-page brief">
       <header className="app-topbar">
         <div className="app-nav">
           <Brand />
@@ -148,15 +148,31 @@ export default function Setup() {
         </div>
       </header>
 
-      <main className="app-container grid gap-6 py-8 lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="grid gap-6">
+      <main className="flow-shell">
+        <section className="flow-hero" data-chapter="Brief">
           <div>
-            <p className="eyebrow">Step 1 of 4</p>
-            <h1 className="page-title mt-2">Set up the interview room.</h1>
-            <p className="body-lg mt-3 max-w-2xl">Choose the role, upload your resume, and confirm camera and microphone access before the mock interview starts.</p>
+            <p className="eyebrow">Act I - briefing desk</p>
+            <h1 className="flow-title mt-3">Set the stage <span>before the first question.</span></h1>
+            <p className="body-lg mt-5 max-w-2xl">Choose the track, attach the resume, and let InterPrep build the private interviewer brief that decides what gets challenged later.</p>
           </div>
+          <div className="flow-summary-card">
+            {[
+              ['Track', selected.name, selected.difficulty],
+              ['Resume', resumeFile ? resumeFile.name : 'Waiting for PDF', resumeFile ? 'ready' : 'required'],
+              ['Media', cameraOk && micOk ? 'Camera and mic ready' : 'Permission pending', cameraOk && micOk ? 'live' : 'check'],
+            ].map(([label, value, stateLabel]) => (
+              <div className="flow-summary-row" key={label}>
+                <small>{label}</small>
+                <strong className="truncate">{value}</strong>
+                <span className="chip">{stateLabel}</span>
+              </div>
+            ))}
+          </div>
+        </section>
 
-          <div className="panel p-5">
+        <section className="flow-stage">
+          <div className="flow-stack">
+          <div className="panel chapter-panel p-5">
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <p className="eyebrow">Role</p>
@@ -164,7 +180,7 @@ export default function Setup() {
               </div>
               <span className="chip">{selected.difficulty}</span>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="role-gallery">
               {ROLES.map(role => {
                 const isActive = selectedRole === role.id
                 return (
@@ -184,7 +200,7 @@ export default function Setup() {
             </div>
           </div>
 
-          <div className="panel p-5">
+          <div className="panel chapter-panel p-5">
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <p className="eyebrow">Resume</p>
@@ -236,10 +252,10 @@ export default function Setup() {
               </div>
             )}
           </div>
-        </section>
+          </div>
 
-        <aside className="grid content-start gap-6 lg:sticky lg:top-24">
-          <div className="panel p-5">
+        <aside className="flow-sticky">
+          <div className="panel chapter-panel p-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <p className="eyebrow">Camera and microphone</p>
@@ -247,8 +263,9 @@ export default function Setup() {
               </div>
               <Video className={cameraOk ? 'text-success' : 'text-t3'} />
             </div>
-            <div className="camera-box">
+            <div className="camera-box camera-stage">
               <video ref={videoRef} autoPlay playsInline muted />
+              <span className="camera-scan" />
               {!cameraOk && (
                 <div className="absolute inset-0 grid place-items-center text-center">
                   <p className="body">{cameraError || 'Starting camera...'}</p>
@@ -273,10 +290,13 @@ export default function Setup() {
             </div>
           </div>
 
-          <div className="panel p-5">
+          <div className="panel chapter-panel p-5">
             <p className="eyebrow">Interviewer brief</p>
             <h2 className="mt-2 text-2xl font-bold text-t1">{brief?.name ? `${brief.name}'s brief` : 'Generated after upload'}</h2>
             <p className="body mt-2">{brief?.summary || 'The AI will use your resume to choose sharper follow-up questions and identify claims worth testing.'}</p>
+            <div className="briefing-note mt-5">
+              <p className="font-serif text-2xl leading-tight text-t1">The brief is hidden from you during the interview. That is the point.</p>
+            </div>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <div>
                 <p className="eyebrow text-success">Strengths</p>
@@ -293,6 +313,7 @@ export default function Setup() {
             </div>
           </div>
         </aside>
+        </section>
       </main>
     </div>
   )

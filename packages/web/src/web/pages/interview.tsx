@@ -252,7 +252,7 @@ export default function Interview() {
   }
 
   return (
-    <div className="app-page h-screen overflow-hidden">
+    <div className="interview-room">
       <header className="border-b border-border-sub bg-bg0/92">
         <div className="flex h-16 items-center justify-between gap-5 px-6">
           <div className="flex min-w-0 items-center gap-4">
@@ -271,9 +271,9 @@ export default function Interview() {
         </div>
       </header>
 
-      <main className="grid h-[calc(100vh-64px)] grid-cols-[1fr_420px]">
-        <section className="grid grid-rows-[1fr_auto] overflow-hidden">
-          <div className="flex items-center p-10">
+      <main className="interview-grid">
+        <section className="question-stage">
+          <div className="question-copy">
             <div className="max-w-4xl">
               <div className="mb-5 flex flex-wrap items-center gap-2">
                 <span className="chip">{q?.type || 'Technical'}</span>
@@ -282,14 +282,15 @@ export default function Interview() {
                 {state === 'listening' && <span className="chip text-success"><Mic size={13} /> Listening</span>}
                 {state === 'processing' && <span className="chip">Saving answer...</span>}
               </div>
-              <h1 className="text-5xl font-bold leading-tight text-t1">{q?.text}</h1>
+              <p className="eyebrow">Act III - live interview</p>
+              <h1 className="mt-5">{q?.text}</h1>
               <p className="body-lg mt-5 max-w-2xl">
                 Answer out loud. Be structured. If speech recognition is unavailable, type your answer in the transcript box.
               </p>
             </div>
           </div>
 
-          <div className="border-t border-border-sub bg-bg1 p-6">
+          <div className="transcript-dock">
             <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
               <div className="panel-soft min-h-28 p-4">
                 <p className="eyebrow">Transcript</p>
@@ -320,9 +321,10 @@ export default function Interview() {
           </div>
         </section>
 
-        <aside className="border-l border-border-sub bg-bg0 p-5">
-          <div className="camera-box">
+        <aside className="interview-sidebar">
+          <div className="camera-box camera-stage">
             <video ref={videoRef} autoPlay playsInline muted />
+            <span className="camera-scan" />
             {!cameraOk && (
               <div className="absolute inset-0 grid place-items-center text-center">
                 <div>
@@ -350,6 +352,18 @@ export default function Interview() {
             <div className="metric">
               <p className="metric-value text-t1">{state === 'silence' ? `${4 - silenceLeft}s` : '-'}</p>
               <p className="metric-label">Response gap</p>
+            </div>
+          </div>
+
+          <div className="signal-meter">
+            <div className="flex items-center justify-between">
+              <p className="eyebrow">Stress trace</p>
+              <span className="chip">{state}</span>
+            </div>
+            <div className="signal-line">
+              {[36, 48, 62, 52, 74, 44, 58, 82, 66, 40, 70, 55].map((height, index) => (
+                <span key={index} style={{ height: `${height}%`, animationDelay: `${index * 80}ms` }} />
+              ))}
             </div>
           </div>
 

@@ -68,7 +68,7 @@ export default function Calibration() {
   const progress = state === 'running' ? ((20 - seconds) / 20) * 100 : state === 'complete' ? 100 : 0
 
   return (
-    <div className="app-page">
+    <div className="flow-page baseline">
       <header className="app-topbar">
         <div className="app-nav">
           <Brand />
@@ -84,10 +84,11 @@ export default function Calibration() {
         </div>
       </header>
 
-      <main className="app-container grid min-h-[calc(100vh-72px)] items-center gap-6 py-8 lg:grid-cols-[1.15fr_0.85fr]">
-        <section className="panel overflow-hidden">
-          <div className="camera-box aspect-[16/9] border-0">
+      <main className="baseline-layout">
+        <section className="baseline-stage">
+          <div className="camera-box">
             <video ref={videoRef} autoPlay playsInline muted />
+            <span className="camera-scan" />
             {!cameraOk && (
               <div className="absolute inset-0 grid place-items-center text-center">
                 <p className="body">Camera is starting...</p>
@@ -96,6 +97,11 @@ export default function Calibration() {
             <div className="absolute left-5 top-5 flex gap-2">
               <span className="chip"><span className={`status-dot ${cameraOk ? 'ok' : 'warn'}`} /> camera</span>
               <span className="chip"><span className={`status-dot ${micOk ? 'ok' : 'warn'}`} /> mic</span>
+            </div>
+            <div className="absolute bottom-5 left-5 right-5 grid gap-3 md:grid-cols-3">
+              <div className="metric"><p className="metric-value">{pitch}Hz</p><p className="metric-label">Voice reference</p></div>
+              <div className="metric"><p className="metric-value text-success">{pace || '-'}</p><p className="metric-label">Natural pace</p></div>
+              <div className="metric"><p className="metric-value text-warning">{state === 'running' ? seconds : state === 'complete' ? 'saved' : 'ready'}</p><p className="metric-label">Baseline state</p></div>
             </div>
             {state === 'running' && (
               <div className="absolute right-5 top-5 rounded-[8px] bg-bg0/80 px-5 py-3 text-right backdrop-blur">
@@ -115,18 +121,25 @@ export default function Calibration() {
           </div>
         </section>
 
-        <aside className="grid gap-6">
+        <aside className="baseline-panel">
           <div>
-            <p className="eyebrow">Step 2 of 4</p>
-            <h1 className="page-title mt-2">Build your baseline.</h1>
+            <p className="eyebrow">Act II - baseline chamber</p>
+            <h1 className="flow-title mt-2">Lock in your <span>normal.</span></h1>
             <p className="body-lg mt-3">Read the prompt naturally for 20 seconds. This gives the report a reference point for voice and composure.</p>
           </div>
 
-          <div className="panel p-5">
+          <div className="baseline-dial">
+            <div className="text-center">
+              <strong>{state === 'running' ? seconds : state === 'complete' ? 'OK' : '20'}</strong>
+              <span className="metric-label">{state === 'running' ? 'seconds left' : state === 'complete' ? 'baseline saved' : 'second capture'}</span>
+            </div>
+          </div>
+
+          <div className="prompt-card">
             <p className="eyebrow">Prompt</p>
-            <p className="mt-3 text-2xl font-bold leading-snug text-t1">
+            <blockquote>
               "My name is [name]. I'm interviewing for this role because I want to build reliable products with a strong team."
-            </p>
+            </blockquote>
             <div className="bar mt-5"><span style={{ width: `${progress}%` }} /></div>
           </div>
 
